@@ -1,0 +1,14 @@
+.navbar {
+  position: sticky;
+  top: 0;
+  background: var(--background);
+  border-bottom: 1px solid var(--border);
+  z-index: 1000;
+  backdrop-filter: blur(10px);
+}
+
+.nav-links li :hover {
+  color: var(--primary);
+  text-shadow: 0 0 10px var(--primary-glow);
+  transition: var(--transition);
+}
