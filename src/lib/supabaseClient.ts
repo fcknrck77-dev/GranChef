@@ -1,6 +1,6 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-let cachedClient: ReturnType<typeof createClient> | null = null;
+let cachedClient: SupabaseClient<any, any, any> | null = null;
 
 export function getSupabase() {
   if (cachedClient) return cachedClient;
@@ -10,6 +10,6 @@ export function getSupabase() {
 
   if (!supabaseUrl || !supabaseKey) return null;
 
-  cachedClient = createClient(supabaseUrl, supabaseKey);
+  cachedClient = createClient<any>(supabaseUrl, supabaseKey);
   return cachedClient;
 }
