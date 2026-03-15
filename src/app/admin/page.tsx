@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { getSupabase } from '@/lib/supabaseClient';
+import { demoFetchAiRequests, demoInsertAiRequest } from '@/lib/demoStore';
 import { Sparkles, Send, RefreshCw, Zap, Users, Shield, ShieldOff, Trash2 } from 'lucide-react';
 
 interface ManagedUser {
@@ -49,7 +50,7 @@ export default function AdminDashboard() {
   const fetchRequests = async () => {
     const supabase = getSupabase();
     if (!supabase) {
-      setRequests([]);
+      setRequests(demoFetchAiRequests(5));
       return;
     }
     const { data } = await supabase.from('ai_requests').select('*').order('created_at', { ascending: false }).limit(5);
@@ -62,8 +63,13 @@ export default function AdminDashboard() {
     setLoading(true);
     const supabase = getSupabase();
     if (!supabase) {
+      const { error } = demoInsertAiRequest(instruction, days);
       setLoading(false);
-      alert('Supabase no está configurado. Define NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY.');
+      if (!error) {
+        setInstruction('');
+        fetchRequests();
+        alert('Orden guardada en modo demo local. Para procesarla con IA real, configura Supabase y ejecuta el script.');
+      }
       return;
     }
     const { error } = await supabase.from('ai_requests').insert({ instruction, days_to_generate: days });
