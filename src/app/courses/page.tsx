@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Course } from '@/data/courses';
+import { Course, courses as localCourses } from '@/data/courses';
 import { ACCESS_CONFIGS, AccessLevel } from '@/data/access';
 import { useUserAuth } from '@/context/UserAuthContext';
 import { useAdminAuth } from '@/context/AdminAuthContext';
@@ -60,7 +60,7 @@ export default function Courses() {
       setLoading(true);
       const supabase = getSupabase();
       if (!supabase) {
-        setDbCourses(FALLBACK_COURSES);
+        setDbCourses(localCourses);
         setLoading(false);
         return;
       }
@@ -72,7 +72,7 @@ export default function Courses() {
         
         if (error || !data || data.length === 0) {
           // Fallback to local data when Supabase is unavailable or empty
-          setDbCourses(FALLBACK_COURSES);
+          setDbCourses(localCourses);
         } else {
           const mapped = data.map((c: any) => ({
             ...c,
@@ -82,7 +82,7 @@ export default function Courses() {
           setDbCourses(mapped);
         }
       } catch {
-        setDbCourses(FALLBACK_COURSES);
+        setDbCourses(localCourses);
       }
       setLoading(false);
     }

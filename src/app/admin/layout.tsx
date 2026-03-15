@@ -9,6 +9,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const navItems = [
     { label: 'Dashboard', href: '/admin', icon: '📊' },
+    { label: 'Usuarios', href: '/admin/users', icon: '🧑‍🍳' },
     { label: 'Pedidos y Clientes', href: '/admin/orders', icon: '👥' },
     { label: 'Configuración de Pagos', href: '/admin/settings', icon: '💳' },
     { label: 'Volver a la Web', href: '/', icon: '🌐' },
@@ -45,8 +46,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <button 
                   onClick={() => {
                     if(confirm('¿Deseas cerrar la sesión administrativa?')) {
-                      window.localStorage.removeItem('gc_admin_session');
-                      window.location.href = '/';
+                      fetch('/api/admin/session/logout', { method: 'POST' }).finally(() => {
+                        window.location.href = '/';
+                      });
                     }
                   }} 
                   className="logout-small"

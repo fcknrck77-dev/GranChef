@@ -8,10 +8,13 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const success = login(username, password);
+    setLoading(true);
+    const success = await login(username, password);
+    setLoading(false);
     if (!success) {
       setError(true);
       setPassword('');
@@ -56,7 +59,7 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
             </div>
             
             <button type="submit" className="login-btn">
-              VALIDAR CREDENCIALES
+              {loading ? 'VALIDANDO...' : 'VALIDAR CREDENCIALES'}
             </button>
           </form>
 

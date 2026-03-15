@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 
 interface AdminAuthContextType {
   isAdmin: boolean;
-  login: (username: string, password: string) => boolean;
+  login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
 }
 
@@ -12,29 +12,37 @@ const AdminAuthContext = createContext<AdminAuthContextType | undefined>(undefin
 
 export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
-  const adminUser = process.env.NEXT_PUBLIC_ADMIN_USER || '';
-  const adminPass = process.env.NEXT_PUBLIC_ADMIN_PASS || '';
 
   useEffect(() => {
-    const savedSession = localStorage.getItem('gc_admin_session');
-    if (savedSession === 'active') {
-      setIsAdmin(true);
-    }
+    (async () => {
+      try {
+        const res = await fetch('/api/admin/session/me', { cache: 'no-store' });
+        const data = await res.json();
+        setIsAdmin(Boolean(data?.isAdmin));
+      } catch {
+        setIsAdmin(false);
+      }
+    })();
   }, []);
 
-  const login = (username: string, password: string) => {
-    // Credenciales personalizadas del Propietario
-    if (adminUser && adminPass && username === adminUser && password === adminPass) {
+  const login = async (username: string, password: string) => {
+    try {
+      const res = await fetch('/api/admin/session/login', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      if (!res.ok) return false;
       setIsAdmin(true);
-      localStorage.setItem('gc_admin_session', 'active');
       return true;
+    } catch {
+      return false;
     }
-    return false;
   };
 
   const logout = () => {
     setIsAdmin(false);
-    localStorage.removeItem('gc_admin_session');
+    fetch('/api/admin/session/logout', { method: 'POST' }).catch(() => {});
   };
 
   return (

@@ -5,13 +5,15 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "supabase:setup": "node scripts/setup_supabase.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.99.1",
     "lucide-react": "^0.577.0",
     "next": "16.1.6",
     "openai": "^6.29.0",
+    "pg": "^8.13.3",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },

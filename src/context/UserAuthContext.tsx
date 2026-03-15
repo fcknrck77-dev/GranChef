@@ -94,7 +94,7 @@ export const UserAuthProvider = ({ children }: { children: React.ReactNode }) =>
     // Simulación de login. En producción iría a Supabase.
     // Especial para admin
     if (adminUser && adminPass && email === adminUser && pass === adminPass) {
-       adminLogin(email, pass);
+       await adminLogin(email, pass);
        // Activamos sesión de administrador
        const adminState: AuthState = {
          isRegistered: true,
