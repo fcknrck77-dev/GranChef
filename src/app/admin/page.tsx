@@ -31,7 +31,7 @@ export default function AdminDashboard() {
 
   const handleUserAction = async (userId: string, action: 'block' | 'unblock' | 'delete') => {
     if (action === 'delete') {
-      alert('Borrado no implementado en la previa. Usa Bloquear/Activar o gestiona en Supabase.');
+      alert('El borrado desde el panel no está disponible. Usa Bloquear/Activar o gestiona el usuario en Supabase.');
       return;
     }
 
@@ -166,7 +166,7 @@ export default function AdminDashboard() {
       if (!error) {
         setInstruction('');
         fetchRequests();
-        alert('Orden guardada en modo demo local. Para usar Supabase, entra como admin y reintenta.');
+        alert('Orden guardada localmente. Para procesarla en Supabase, revisa la configuración del servidor y reintenta.');
       }
     } finally {
       setLoading(false);

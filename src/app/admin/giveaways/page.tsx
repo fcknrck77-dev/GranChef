@@ -38,7 +38,7 @@ export default function AdminGiveawaysPage() {
         <p style={{ opacity: 0.8 }}>
           Esta seccion requiere backend (`/api/admin/*`) y no esta disponible en el export estatico para FTP.
         </p>
-        <Link href="/admin/users" className="btn link">Ir a Usuarios (modo demo)</Link>
+        <Link href="/admin/users" className="btn link">Ir a Usuarios</Link>
       </div>
     );
   }

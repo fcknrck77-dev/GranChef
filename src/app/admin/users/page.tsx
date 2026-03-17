@@ -113,7 +113,7 @@ export default function AdminUsersPage() {
       <header className="page-header">
         <div className="head-left">
           <h1 className="neon-text">Usuarios</h1>
-          <p>Perfiles, pagos, planes, bloqueos y premios (modo demo local).</p>
+          <p>Perfiles, pagos, planes, bloqueos y premios.</p>
         </div>
         <div className="head-actions">
           <button className="btn subtle" onClick={() => { demoBlockOverdueUsers(1); forceRefresh(); }}>
