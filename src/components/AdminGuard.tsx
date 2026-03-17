@@ -30,7 +30,7 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
             <span className="icon">ADMIN</span>
             <h2>ACCESO DE ADMINISTRADOR</h2>
             <p>Identificación necesaria para acceder al panel.</p>
-            <p className="hint">Usa las credenciales configuradas en <code>.env.local</code> (ADMIN_USER / ADMIN_PASS).</p>
+            <p className="hint">Usa las credenciales configuradas en Vercel/servidor (ADMIN_USER / ADMIN_PASS). En modo demo tambiÃ©n puede usarse NEXT_PUBLIC_ADMIN_USER / NEXT_PUBLIC_ADMIN_PASS.</p>
           </div>
           
           <form onSubmit={handleSubmit}>
