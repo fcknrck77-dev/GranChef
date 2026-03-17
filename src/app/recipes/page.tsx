@@ -1,239 +1,328 @@
 'use client';
 
-import { useState } from 'react';
-import { recipes, Recipe } from '@/data/recipes';
-import { ingredients, Ingredient } from '@/data/ingredients';
-import { techniques, Technique } from '@/data/techniques';
-import { ACCESS_CONFIGS, AccessLevel } from '@/data/access';
-import { useAdminAuth } from '@/context/AdminAuthContext';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
+import { recipes as localRecipes, Recipe, recipeDetailedSteps, recipeTotalTimeLabel } from '@/data/recipes';
+import { ingredients as localIngredients, Ingredient } from '@/data/ingredients';
+import { techniques as localTechniques, Technique } from '@/data/techniques';
+import { ACCESS_CONFIGS } from '@/data/access';
+import { useUserAuth } from '@/context/UserAuthContext';
+import { useAdminAuth } from '@/context/AdminAuthContext';
 import DetailModal from '@/components/DetailModal';
+import { getSupabase } from '@/lib/supabaseClient';
+
+function canAccessRecipe(userLevel: 'FREE' | 'PRO' | 'PREMIUM' | 'ADMIN', tier: 'FREE' | 'PRO' | 'PREMIUM') {
+  if (userLevel === 'ADMIN') return true;
+  if (tier === 'FREE') return true;
+  if (tier === 'PRO') return userLevel === 'PRO' || userLevel === 'PREMIUM';
+  if (tier === 'PREMIUM') return userLevel === 'PREMIUM';
+  return false;
+}
+
+function findIngredientByName(list: Ingredient[], name: string) {
+  const n = name.trim().toLowerCase();
+  return list.find((i) => i.name.trim().toLowerCase() === n) || null;
+}
+
+function findTechniqueById(list: Technique[], id: string) {
+  return list.find((t) => t.id === id) || null;
+}
 
 export default function RecipesPage() {
+  const { getEffectiveLevel, requireAuth } = useUserAuth();
   const { isAdmin } = useAdminAuth();
-  const [simulatedLevel, setSimulatedLevel] = useState<AccessLevel>('FREE');
+  const params = useSearchParams();
+
+  const [recipesData, setRecipesData] = useState<Recipe[]>(localRecipes);
+  const [ingredientsData, setIngredientsData] = useState<Ingredient[]>(localIngredients);
+  const [techniquesData, setTechniquesData] = useState<Technique[]>(localTechniques);
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [selectedItem, setSelectedItem] = useState<Ingredient | Technique | null>(null);
+  const [query, setQuery] = useState('');
 
-  const userLevel = isAdmin ? 'ADMIN' : simulatedLevel;
+  const userLevel = isAdmin ? 'ADMIN' : getEffectiveLevel();
   const config = ACCESS_CONFIGS[userLevel];
-  const recipesLimit = isAdmin ? -1 : config.features.recipesLimit;
-  const visibleRecipes = recipesLimit === -1 ? recipes : recipes.slice(0, recipesLimit);
-  const hasMoreRecipes = recipesLimit !== -1 && recipes.length > recipesLimit;
 
-  const canAccess = (tier: 'FREE' | 'PRO' | 'PREMIUM') => {
-    if (userLevel === 'ADMIN') return true;
-    if (tier === 'FREE') return true;
-    if (tier === 'PRO') return userLevel === 'PRO' || userLevel === 'PREMIUM';
-    if (tier === 'PREMIUM') return userLevel === 'PREMIUM';
-    return false;
-  };
+  useEffect(() => {
+    const supabase = getSupabase();
+    if (!supabase) return;
 
-  const findIngredient = (name: string) => ingredients.find(i => i.name.toLowerCase() === name.toLowerCase());
-  const findTechnique = (id: string) => techniques.find(t => t.id === id);
+    (async () => {
+      try {
+        const [recipesRes, ingRes, techRes] = await Promise.all([
+          supabase.from('recipes').select('*').order('created_at', { ascending: false }).limit(300),
+          supabase.from('ingredients').select('*').order('family', { ascending: true }).order('name', { ascending: true }).limit(300),
+          supabase.from('techniques').select('*').order('category', { ascending: true }).order('name', { ascending: true }).limit(300),
+        ]);
+
+        if (!recipesRes.error && recipesRes.data && recipesRes.data.length > 0) {
+          const mapped: Recipe[] = recipesRes.data.map((r: any) => ({
+            id: String(r.id),
+            title: String(r.title),
+            source: String(r.source || 'Grand Chef'),
+            tier: String(r.tier) as any,
+            difficulty: String(r.difficulty || 'Basico') as any,
+            servings: Number(r.servings || 2),
+            times: (r.times && typeof r.times === 'object' ? r.times : { prepMin: 10, cookMin: 10 }) as any,
+            description: String(r.description || ''),
+            utensils: Array.isArray(r.utensils) ? r.utensils.map(String) : [],
+            ingredients: Array.isArray(r.ingredients) ? r.ingredients : [],
+            steps: Array.isArray(r.steps) ? r.steps.map(String) : [],
+            techniques: Array.isArray(r.techniques) ? r.techniques.map(String) : [],
+            tags: Array.isArray(r.tags) ? r.tags.map(String) : [],
+          }));
+
+          // Merge DB recipes on top of local, unique by id.
+          const byId = new Map<string, Recipe>();
+          for (const rr of localRecipes) byId.set(rr.id, rr);
+          for (const rr of mapped) byId.set(rr.id, rr);
+          setRecipesData(Array.from(byId.values()));
+        }
+
+        if (!ingRes.error && ingRes.data && ingRes.data.length > 0) {
+          const mapped = ingRes.data.map((row: any) => ({
+            id: String(row.id),
+            name: String(row.name),
+            category: String(row.category),
+            family: String(row.family),
+            description: String(row.description),
+            pairingNotes: Array.isArray(row.pairing_notes) ? row.pairing_notes.map(String) : [],
+            stories: row.stories && typeof row.stories === 'object' ? row.stories : undefined,
+          }));
+          setIngredientsData(mapped);
+        }
+
+        if (!techRes.error && techRes.data && techRes.data.length > 0) {
+          const mapped = techRes.data.map((row: any) => ({
+            id: String(row.id),
+            name: String(row.name),
+            category: String(row.category) as any,
+            description: String(row.description),
+            difficulty: String(row.difficulty) as any,
+            equipment: Array.isArray(row.equipment) ? row.equipment.map(String) : [],
+            reagents: Array.isArray(row.reagents) ? row.reagents.map(String) : [],
+            pairingNotes: Array.isArray(row.pairing_notes) ? row.pairing_notes.map(String) : [],
+          }));
+          setTechniquesData(mapped);
+        }
+      } catch {
+        // Keep local fallback
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    const q = (params.get('q') || '').trim();
+    if (q) setQuery(q);
+  }, [params]);
+
+  useEffect(() => {
+    const open = (params.get('open') || '').trim();
+    if (!open) return;
+    if (selectedRecipe) return;
+    const r = recipesData.find((x) => x.id === open) || null;
+    if (r && canAccessRecipe(userLevel, r.tier)) requireAuth(() => setSelectedRecipe(r));
+  }, [params, recipesData, selectedRecipe, userLevel, requireAuth]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const list = q
+      ? recipesData.filter((r) => {
+          if (r.title.toLowerCase().includes(q)) return true;
+          if (r.tags.some((t) => t.toLowerCase().includes(q))) return true;
+          if (r.ingredients.some((i) => i.name.toLowerCase().includes(q))) return true;
+          return false;
+        })
+      : recipesData;
+
+    const limit = userLevel === 'ADMIN' ? -1 : config.features.recipesLimit;
+    return limit === -1 ? list : list.slice(0, limit);
+  }, [query, recipesData, userLevel, config.features.recipesLimit]);
+
+  const hasMore = userLevel !== 'ADMIN' && config.features.recipesLimit !== -1 && recipesData.length > config.features.recipesLimit;
 
   return (
     <div className="recipes-page container">
       <header className="page-header">
-        {!isAdmin && (
-          <div className="tier-switcher glass">
-            <small>MODO DEMO:</small>
-            <button onClick={() => setSimulatedLevel('FREE')} className={simulatedLevel === 'FREE' ? 'active' : ''}>FREE</button>
-            <button onClick={() => setSimulatedLevel('PRO')} className={simulatedLevel === 'PRO' ? 'active' : ''}>PRO</button>
-            <button onClick={() => setSimulatedLevel('PREMIUM')} className={simulatedLevel === 'PREMIUM' ? 'active' : ''}>PREMIUM</button>
-          </div>
-        )}
-        <h1 className="neon-text">Protocolos de Ejecución</h1>
-        <p className="subtitle">Algoritmos culinarios extraídos de la biblioteca "Omniscience".</p>
+        <h1 className="neon-text">Recetas y Protocolos</h1>
+        <p className="subtitle">Recetas completas con pesos, tiempos, utensilios y técnicas.</p>
+
+        <div className="search-row">
+          <input
+            className="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar por receta, ingrediente o etiqueta..."
+          />
+          <div className="badge">{userLevel}</div>
+        </div>
       </header>
 
       <div className="recipes-grid">
-        {visibleRecipes.map(recipe => {
-          const locked = !canAccess(recipe.tier);
+        {filtered.map((r) => {
+          const locked = !canAccessRecipe(userLevel, r.tier);
           return (
-            <div key={recipe.id} className={`recipe-card glass ${locked ? 'locked' : ''}`} onClick={() => !locked && setSelectedRecipe(recipe)}>
-              <div className="card-header">
-                <span className={`tier-badge ${recipe.tier.toLowerCase()}`}>{recipe.tier}</span>
-                <span className="source-label">{recipe.source}</span>
+            <div
+              key={r.id}
+              className={`recipe-card glass ${locked ? 'locked' : ''}`}
+              onClick={() => {
+                if (locked) {
+                  requireAuth(() => { window.location.href = '/pricing'; });
+                  return;
+                }
+                requireAuth(() => setSelectedRecipe(r));
+              }}
+            >
+              <div className="card-head">
+                <span className={`tier ${r.tier.toLowerCase()}`}>{r.tier}</span>
+                <span className="meta">{r.servings} raciones | {recipeTotalTimeLabel(r)}</span>
               </div>
-              
-              <div className="card-body">
-                <h3>{recipe.title}</h3>
-                <p className="recipe-desc">{recipe.description}</p>
-                
-                <div className="recipe-meta">
-                  <span>Dificultad: {recipe.difficulty}</span>
-                  <span>Tiempo: {recipe.prepTime}</span>
+              <h3>{r.title}</h3>
+              <p className="desc">{r.description}</p>
+              <div className="tags">
+                {r.tags.slice(0, 3).map((t) => (
+                  <span key={t} className="tag">{t}</span>
+                ))}
+              </div>
+              {locked ? (
+                <div className="locked-cta">
+                  <Link href="/pricing" className="unlock-link">Activar plan {r.tier}</Link>
                 </div>
-
-                {locked ? (
-                  <div className="locked-action">
-                    <span className="lock-mini">🔒</span>
-                    <Link href="/pricing" className="unlock-link">Desbloquear Nivel {recipe.tier}</Link>
-                  </div>
-                ) : (
-                  <button className="view-recipe-btn">Ver Protocolo Completo</button>
-                )}
-              </div>
+              ) : (
+                <button className="open-btn">Ver receta</button>
+              )}
             </div>
           );
         })}
       </div>
 
-      {hasMoreRecipes && (
-        <div className="lock-overlay glass animate-fadeIn" style={{ marginTop: 40 }}>
-          <div className="lock-content">
-            <span className="lock-icon">🔒</span>
-            <h2>CONTENIDO ADICIONAL BLOQUEADO</h2>
-            <p>Tu plan actual muestra <strong>{recipesLimit}</strong> protocolos. Evoluciona a <strong>PRO</strong> o <strong>PREMIUM</strong> para desbloquear el archivo completo.</p>
-            <Link href="/pricing" className="upgrade-btn">Evolucionar Cuenta</Link>
-          </div>
+      {hasMore && (
+        <div className="more-lock glass">
+          <h2>Contenido adicional bloqueado</h2>
+          <p>Tu plan actual muestra {config.features.recipesLimit} recetas. Sube a PRO o PREMIUM para ver todo.</p>
+          <Link href="/pricing" className="upgrade">Ver planes</Link>
         </div>
       )}
 
       {selectedRecipe && (
-        <div className="recipe-detail-overlay animate-fadeIn" onClick={() => setSelectedRecipe(null)}>
-          <div className="recipe-detail-modal glass neon-border animate-slideUp" onClick={e => e.stopPropagation()}>
-            <button className="close-modal" onClick={() => setSelectedRecipe(null)}>×</button>
-            
-            <div className="recipe-modal-header">
-              <span className="recipe-source">{selectedRecipe.source}</span>
-              <h2 className="recipe-title">{selectedRecipe.title}</h2>
-              <div className="recipe-meta-row">
-                <span className="meta-pill">{selectedRecipe.difficulty}</span>
-                <span className="meta-pill">{selectedRecipe.prepTime}</span>
+        <div className="recipe-overlay" onClick={() => setSelectedRecipe(null)}>
+          <div className="recipe-modal glass neon-border" onClick={(e) => e.stopPropagation()}>
+            <button className="close" onClick={() => setSelectedRecipe(null)}>X</button>
+            <header className="modal-head">
+              <span className={`tier ${selectedRecipe.tier.toLowerCase()}`}>{selectedRecipe.tier}</span>
+              <h2>{selectedRecipe.title}</h2>
+              <div className="modal-meta">
+                <span>Dificultad: {selectedRecipe.difficulty}</span>
+                <span>Tiempo total: {recipeTotalTimeLabel(selectedRecipe)}</span>
+                <span>Raciones: {selectedRecipe.servings}</span>
               </div>
-            </div>
+              <p className="modal-desc">{selectedRecipe.description}</p>
+            </header>
 
-            <div className="recipe-modal-grid">
-              <div className="recipe-col">
-                <section className="recipe-section">
-                  <h4>MATERIA PRIMA (CLIC PARA INFO)</h4>
-                  <ul className="ingredient-list">
-                    {selectedRecipe.ingredients.map((ing, idx) => {
-                      const ingData = findIngredient(ing.name);
-                      return (
-                        <li key={idx} className={ingData ? 'clickable' : ''} onClick={() => ingData && setSelectedItem(ingData)}>
-                          <span className="ing-amount">{ing.amount}</span>
-                          <span className="ing-name">{ing.name} {ingData && 'ℹ️'}</span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </section>
+            <div className="modal-grid">
+              <section>
+                <h4>Utensilios</h4>
+                <ul>
+                  {selectedRecipe.utensils.map((u) => <li key={u}>{u}</li>)}
+                </ul>
+              </section>
 
-                <section className="recipe-section">
-                  <h4>TECNOLOGÍAS APLICADAS</h4>
-                  <div className="tech-pills">
-                    {selectedRecipe.techStack.map(techId => {
-                      const tech = findTechnique(techId);
-                      return tech ? (
-                        <span key={techId} className="tech-pill clickable" onClick={() => setSelectedItem(tech)}>
-                          {tech.name} ℹ️
-                        </span>
-                      ) : null;
-                    })}
-                  </div>
-                </section>
-              </div>
+              <section>
+                <h4>Ingredientes</h4>
+                <ul className="ings">
+                  {selectedRecipe.ingredients.map((ing) => (
+                    <li
+                        key={`${ing.name}-${ing.amount}-${ing.unit}`}
+                        className="ing"
+                        onClick={() => {
+                        const item = findIngredientByName(ingredientsData, ing.name);
+                        if (item) setSelectedItem(item);
+                      }}
+                      title="Ver ingrediente"
+                    >
+                      <span>{ing.name}{ing.notes ? ` (${ing.notes})` : ''}</span>
+                      <span className="amt">{ing.amount}{ing.unit}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
 
-              <div className="recipe-col">
-                <section className="recipe-section">
-                  <h4>ALGORITMO DE PREPARACIÓN</h4>
-                  <ol className="step-list">
-                    {selectedRecipe.steps.map((step, idx) => (
-                      <li key={idx}>{step}</li>
-                    ))}
-                  </ol>
-                </section>
-              </div>
+              <section className="steps">
+                <h4>Elaboracion</h4>
+                <ol>
+                  {recipeDetailedSteps(selectedRecipe).map((s, idx) => <li key={idx}>{s}</li>)}
+                </ol>
+              </section>
+
+              <section>
+                <h4>Tecnicas</h4>
+                <div className="techs">
+                  {selectedRecipe.techniques.map((id) => {
+                    const t = findTechniqueById(techniquesData, id);
+                    if (!t) return null;
+                    return (
+                      <button key={id} className="tech" onClick={() => setSelectedItem(t)} title="Ver tecnica">
+                        {t.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
             </div>
           </div>
         </div>
       )}
 
-      {selectedItem && (
-        <DetailModal item={selectedItem} onClose={() => setSelectedItem(null)} />
-      )}
+      {selectedItem && <DetailModal item={selectedItem} onClose={() => setSelectedItem(null)} />}
 
       <style jsx>{`
-        .recipes-page { padding: 120px 20px; min-height: 100vh; }
-        .page-header { text-align: center; margin-bottom: 80px; }
-        .neon-text { font-size: 3.5rem; margin-bottom: 10px; }
-        .subtitle { opacity: 0.6; font-size: 1.2rem; letter-spacing: 1px; }
+        .page-header { margin: 40px 0 30px; }
+        .subtitle { opacity: 0.6; max-width: 900px; }
+        .search-row { display: flex; gap: 12px; align-items: center; margin-top: 20px; }
+        .search { flex: 1; padding: 14px 18px; border-radius: 14px; border: 1px solid var(--border); background: var(--card-bg); color: var(--foreground); outline: none; }
+        .badge { padding: 10px 14px; border-radius: 14px; border: 1px solid var(--border); opacity: 0.8; font-weight: 800; letter-spacing: 1px; }
 
-        .tier-switcher { display: inline-flex; align-items: center; gap: 10px; padding: 10px 20px; border-radius: 50px; margin-bottom: 30px; }
-        .tier-switcher button { background: none; border: 1px solid transparent; color: white; padding: 5px 15px; border-radius: 20px; cursor: pointer; transition: 0.3s; font-size: 0.8rem; font-weight: 800; }
-        .tier-switcher button.active { background: var(--primary); border-color: var(--primary); box-shadow: var(--neon-shadow); }
+        .recipes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 18px; }
+        .recipe-card { padding: 22px; border-radius: 22px; border: 1px solid var(--border); cursor: pointer; transition: 0.25s; }
+        .recipe-card:hover { transform: translateY(-4px); border-color: var(--primary); box-shadow: var(--neon-shadow); }
+        .recipe-card.locked { opacity: 0.6; filter: grayscale(1); cursor: default; }
+        .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .tier { font-size: 0.7rem; font-weight: 900; padding: 4px 10px; border-radius: 8px; border: 1px solid var(--border); }
+        .tier.free { opacity: 0.7; }
+        .tier.pro { color: #00f2ff; border-color: rgba(0,242,255,0.4); }
+        .tier.premium { color: #ff0055; border-color: rgba(255,0,85,0.4); }
+        .meta { opacity: 0.5; font-size: 0.8rem; }
+        h3 { margin: 8px 0; font-size: 1.1rem; }
+        .desc { opacity: 0.65; line-height: 1.5; min-height: 48px; }
+        .tags { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+        .tag { font-size: 0.75rem; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--border); background: rgba(255,255,255,0.03); opacity: 0.8; }
+        .open-btn { margin-top: 14px; width: 100%; padding: 12px; border-radius: 14px; border: 1px solid var(--border); background: rgba(var(--primary-rgb), 0.04); color: var(--foreground); font-weight: 800; cursor: pointer; }
+        .locked-cta { margin-top: 12px; text-align: center; }
+        .unlock-link { color: var(--primary); text-decoration: underline; font-weight: 800; }
 
-        .recipes-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 30px; transition: 0.5s; }
-        .recipes-grid.blurred { filter: blur(10px); pointer-events: none; }
+        .more-lock { margin: 28px 0 0; padding: 22px; border-radius: 22px; border: 1px solid var(--border); text-align: center; }
+        .upgrade { display: inline-block; margin-top: 12px; padding: 10px 16px; border-radius: 999px; background: var(--primary); color: white; font-weight: 900; text-decoration: none; }
 
-        .lock-overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 10; background: rgba(0,0,0,0.4); backdrop-filter: blur(5px); }
-        .lock-content { text-align: center; padding: 60px; border-radius: 40px; border: 1px solid var(--border); max-width: 500px; }
-        .lock-icon { font-size: 4rem; display: block; margin-bottom: 20px; }
-        .upgrade-btn { display: inline-block; margin-top: 30px; padding: 15px 40px; background: var(--primary); color: white; border-radius: 50px; text-decoration: none; font-weight: 900; box-shadow: var(--neon-shadow); }
-
-        .recipe-card { border-radius: 30px; border: 1px solid var(--border); overflow: hidden; transition: 0.3s; cursor: pointer; position: relative; }
-        .recipe-card:hover:not(.locked) { transform: translateY(-10px); border-color: var(--primary); box-shadow: 0 10px 30px rgba(0, 242, 255, 0.1); }
-        .recipe-card.locked { opacity: 0.6; grayscale: 1; filter: grayscale(1); }
-
-        .card-header { padding: 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
-        .tier-badge { font-size: 0.7rem; font-weight: 900; padding: 4px 10px; border-radius: 5px; }
-        .tier-badge.pro { background: rgba(0,242,255,0.1); color: #00f2ff; }
-        .tier-badge.premium { background: rgba(255,0,85,0.1); color: #ff0055; }
-        .source-label { font-size: 0.7rem; opacity: 0.4; text-transform: uppercase; letter-spacing: 1px; }
-
-        .card-body { padding: 30px; }
-        h3 { font-size: 1.4rem; margin-bottom: 15px; }
-        .recipe-desc { font-size: 0.9rem; opacity: 0.6; line-height: 1.6; height: 80px; overflow: hidden; margin-bottom: 25px; }
-        
-        .recipe-meta { display: flex; gap: 20px; font-size: 0.8rem; font-weight: 700; opacity: 0.4; margin-bottom: 30px; }
-
-        .view-recipe-btn { width: 100%; padding: 15px; border-radius: 15px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: white; font-weight: 800; cursor: pointer; transition: 0.3s; }
-        .view-recipe-btn:hover { background: var(--primary); border-color: var(--primary); }
-
-        .locked-action { text-align: center; padding-top: 10px; }
-        .unlock-link { color: var(--primary); font-size: 0.8rem; font-weight: 800; text-decoration: underline; }
-        .lock-mini { margin-right: 8px; }
-
-        /* Recipe Modal */
-        .recipe-detail-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); backdrop-filter: blur(15px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; }
-        .recipe-detail-modal { width: 100%; max-width: 1100px; max-height: 90vh; overflow-y: auto; background: #050505; border-radius: 40px; padding: 60px; position: relative; color: white; }
-        
-        .close-modal { position: absolute; top: 30px; right: 30px; background: none; border: none; color: white; font-size: 2rem; cursor: pointer; opacity: 0.5; transition: 0.3s; }
-        .close-modal:hover { opacity: 1; transform: rotate(90deg); }
-
-        .recipe-source { font-size: 0.8rem; opacity: 0.5; letter-spacing: 3px; text-transform: uppercase; }
-        .recipe-title { font-size: 3rem; margin: 15px 0; font-weight: 900; line-height: 1.1; }
-        .recipe-meta-row { display: flex; gap: 15px; margin-bottom: 40px; }
-        .meta-pill { padding: 5px 15px; border-radius: 20px; border: 1px solid var(--border); font-size: 0.8rem; font-weight: 700; opacity: 0.6; }
-
-        .recipe-modal-grid { display: grid; grid-template-columns: 1fr 1.5fr; gap: 60px; }
-        .recipe-section h4 { font-size: 0.8rem; letter-spacing: 2px; color: var(--primary); margin-bottom: 25px; }
-
-        .ingredient-list { list-style: none; padding: 0; }
-        .ingredient-list li { padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; font-size: 1.1rem; }
-        .clickable { cursor: pointer; transition: 0.2s; }
-        .clickable:hover { color: var(--primary); padding-left: 5px; }
-        .ing-amount { opacity: 0.5; font-weight: 300; }
-
-        .tech-pills { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px; }
-        .tech-pill { padding: 8px 18px; border-radius: 30px; background: rgba(var(--primary-rgb), 0.1); border: 1px solid var(--primary); color: var(--primary); font-size: 0.9rem; font-weight: 700; }
-        .tech-pill:hover { background: var(--primary); color: black; }
-
-        .step-list { padding-left: 20px; }
-        .step-list li { margin-bottom: 20px; font-size: 1.1rem; line-height: 1.7; opacity: 0.8; }
-
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes slideUp { from { transform: translateY(50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        .animate-fadeIn { animation: fadeIn 0.3s ease; }
-        .animate-slideUp { animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
+        .recipe-overlay { position: fixed; inset: 0; background: var(--overlay-backdrop); backdrop-filter: blur(10px); z-index: 3000; display: flex; align-items: center; justify-content: center; padding: 16px; }
+        .recipe-modal { width: 100%; max-width: 1100px; max-height: 90vh; overflow: auto; padding: 28px; border-radius: 24px; background: var(--modal-surface); color: var(--modal-text); position: relative; }
+        .close { position: absolute; top: 14px; right: 14px; width: 42px; height: 42px; border-radius: 999px; border: 1px solid var(--modal-border); background: var(--modal-surface-2); color: var(--modal-text); cursor: pointer; font-size: 1.1rem; }
+        .modal-head h2 { margin: 10px 0 6px; font-size: 2rem; }
+        .modal-meta { display: flex; gap: 14px; flex-wrap: wrap; opacity: 0.7; font-size: 0.9rem; }
+        .modal-desc { margin-top: 10px; opacity: 0.75; }
+        .modal-grid { margin-top: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+        .steps { grid-column: 1 / -1; }
+        h4 { color: var(--primary); letter-spacing: 2px; text-transform: uppercase; font-size: 0.8rem; margin-bottom: 10px; }
+        ul { margin: 0; padding-left: 18px; }
+        .ings { padding-left: 0; list-style: none; }
+        .ing { display: flex; justify-content: space-between; gap: 10px; padding: 10px 12px; border: 1px solid var(--modal-border); border-radius: 12px; margin-bottom: 8px; cursor: pointer; background: var(--modal-surface-2); }
+        .ing:hover { border-color: rgba(var(--primary-rgb), 0.3); }
+        .amt { opacity: 0.7; font-weight: 800; }
+        .techs { display: flex; flex-wrap: wrap; gap: 10px; }
+        .tech { padding: 10px 12px; border-radius: 999px; border: 1px solid rgba(var(--primary-rgb), 0.35); background: rgba(var(--primary-rgb), 0.1); color: var(--primary); font-weight: 900; cursor: pointer; }
 
         @media (max-width: 900px) {
-          .recipe-modal-grid { grid-template-columns: 1fr; }
-          .recipe-detail-modal { padding: 30px; }
-          .recipe-title { font-size: 2rem; }
+          .modal-grid { grid-template-columns: 1fr; }
         }
       `}</style>
     </div>

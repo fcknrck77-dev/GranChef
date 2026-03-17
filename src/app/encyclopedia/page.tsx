@@ -1,38 +1,115 @@
-'use client';
+﻿'use client';
 
-import { useState } from 'react';
-import { ingredients, Ingredient } from '@/data/ingredients';
-import { techniques, Technique } from '@/data/techniques';
-import { ACCESS_CONFIGS, AccessLevel } from '@/data/access';
+import { useEffect, useMemo, useState } from 'react';
+import { ingredients as localIngredients, Ingredient } from '@/data/ingredients';
+import { techniques as localTechniques, Technique } from '@/data/techniques';
+import { ACCESS_CONFIGS } from '@/data/access';
 import Link from 'next/link';
 import { useUserAuth } from '@/context/UserAuthContext';
 import DetailModal from '@/components/DetailModal';
+import { getSupabase } from '@/lib/supabaseClient';
 
 export default function Encyclopedia() {
-  const { getEffectiveLevel } = useUserAuth();
+  const { getEffectiveLevel, requireAuth } = useUserAuth();
   const [activeTab, setActiveTab] = useState<'ingredients' | 'techniques'>('ingredients');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedItem, setSelectedItem] = useState<Ingredient | Technique | null>(null);
+  const [ingredientsData, setIngredientsData] = useState<Ingredient[]>(localIngredients);
+  const [techniquesData, setTechniquesData] = useState<Technique[]>(localTechniques);
   
   const userLevel = getEffectiveLevel();
   const config = ACCESS_CONFIGS[userLevel];
 
-  const filteredIngredients = ingredients.filter(i => 
-    i.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    i.family.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const cssKey = (s: string) =>
+    String(s || '')
+      .toLowerCase()
+      // Strip accents so "Básico" maps to the ".basico" CSS class.
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9_-]+/g, '');
 
-  const filteredTechniques = techniques.filter(t => 
-    t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    t.category.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  useEffect(() => {
+    const supabase = getSupabase();
+    if (!supabase) return;
 
-  const families = Array.from(new Set(filteredIngredients.map(i => i.family)));
+    (async () => {
+      try {
+        const [ingRes, techRes] = await Promise.all([
+          supabase
+            .from('ingredients')
+            .select('*')
+            .order('family', { ascending: true })
+            .order('name', { ascending: true })
+            .limit(200),
+          supabase
+            .from('techniques')
+            .select('*')
+            .order('category', { ascending: true })
+            .order('name', { ascending: true })
+            .limit(200)
+        ]);
+
+        if (!ingRes.error && ingRes.data && ingRes.data.length > 0) {
+          const mapped = ingRes.data.map((r: any) => ({
+            id: String(r.id),
+            name: String(r.name),
+            category: String(r.category),
+            family: String(r.family),
+            description: String(r.description),
+            pairingNotes: Array.isArray(r.pairing_notes) ? r.pairing_notes.map(String) : [],
+            stories: r.stories && typeof r.stories === 'object' ? r.stories : undefined
+          }));
+          setIngredientsData(mapped);
+        }
+
+        if (!techRes.error && techRes.data && techRes.data.length > 0) {
+          const mapped = techRes.data.map((r: any) => ({
+            id: String(r.id),
+            name: String(r.name),
+            category: String(r.category) as any,
+            description: String(r.description),
+            difficulty: String(r.difficulty) as any,
+            equipment: Array.isArray(r.equipment) ? r.equipment.map(String) : [],
+            reagents: Array.isArray(r.reagents) ? r.reagents.map(String) : [],
+            pairingNotes: Array.isArray(r.pairing_notes) ? r.pairing_notes.map(String) : []
+          }));
+          setTechniquesData(mapped);
+        }
+      } catch {
+        // Keep local fallback
+      }
+    })();
+  }, []);
+
+  const normalizedTerm = searchTerm.trim().toLowerCase();
+
+  const filteredIngredients = useMemo(() => {
+    const list = [...ingredientsData].sort((a, b) => (a.family || '').localeCompare(b.family || '') || (a.name || '').localeCompare(b.name || ''));
+    if (!normalizedTerm) return list;
+    return list.filter((i) => i.name.toLowerCase().includes(normalizedTerm) || i.family.toLowerCase().includes(normalizedTerm));
+  }, [ingredientsData, normalizedTerm]);
+
+  const ingredientIndexById = useMemo(() => {
+    const m = new Map<string, number>();
+    filteredIngredients.forEach((ing, idx) => m.set(ing.id, idx));
+    return m;
+  }, [filteredIngredients]);
+
+  const filteredTechniques = useMemo(() => {
+    const list = [...techniquesData].sort((a, b) => String(a.category || '').localeCompare(String(b.category || '')) || (a.name || '').localeCompare(b.name || ''));
+    if (!normalizedTerm) return list;
+    return list.filter((t) => t.name.toLowerCase().includes(normalizedTerm) || String(t.category).toLowerCase().includes(normalizedTerm));
+  }, [techniquesData, normalizedTerm]);
+
+  const families = useMemo(() => Array.from(new Set(filteredIngredients.map((i) => i.family))), [filteredIngredients]);
 
   const handleItemClick = (item: Ingredient | Technique, isLocked: boolean) => {
-    if (!isLocked) {
-      setSelectedItem(item);
+    if (isLocked) {
+      requireAuth(() => { window.location.href = '/pricing'; });
+      return;
     }
+
+    requireAuth(() => setSelectedItem(item));
   };
 
   return (
@@ -57,10 +134,10 @@ export default function Encyclopedia() {
 
         <nav className="library-nav">
           <button className={`nav-btn ${activeTab === 'ingredients' ? 'active' : ''}`} onClick={() => setActiveTab('ingredients')}>
-            INGREDIENTES ({config.features.ingredientsLimit === -1 ? ingredients.length : `${config.features.ingredientsLimit}/${ingredients.length}`})
+            INGREDIENTES ({config.features.ingredientsLimit === -1 ? ingredientsData.length : `${config.features.ingredientsLimit}/${ingredientsData.length}`})
           </button>
           <button className={`nav-btn ${activeTab === 'techniques' ? 'active' : ''}`} onClick={() => setActiveTab('techniques')}>
-            TÉCNICAS ({config.features.techniquesLimit === -1 ? techniques.length : `${config.features.techniquesLimit}/${techniques.length}`})
+            TÉCNICAS ({config.features.techniquesLimit === -1 ? techniquesData.length : `${config.features.techniquesLimit}/${techniquesData.length}`})
           </button>
         </nav>
       </header>
@@ -72,7 +149,9 @@ export default function Encyclopedia() {
               <h2 className="section-divider">{family}</h2>
               <div className="grid">
                 {filteredIngredients.filter(i => i.family === family).map((ingredient, index) => {
-                  const isLocked = config.features.ingredientsLimit !== -1 && index >= config.features.ingredientsLimit;
+                  const globalIndex = ingredientIndexById.get(ingredient.id) ?? index;
+                  const isLocked = config.features.ingredientsLimit !== -1 && globalIndex >= config.features.ingredientsLimit;
+                  const requiredTier = globalIndex >= ACCESS_CONFIGS.PRO.features.ingredientsLimit ? 'PREMIUM' : 'PRO';
                   
                   return (
                     <div 
@@ -82,8 +161,8 @@ export default function Encyclopedia() {
                     >
                       {isLocked ? (
                         <div className="lock-overlay">
-                          <span className="lock-icon">🔒</span>
-                          <p>Disponible en PRO</p>
+                          <span className="lock-icon">Bloqueado</span>
+                          <p>Disponible en {requiredTier}</p>
                           <Link href="/pricing" className="unlock-link">Desbloquear</Link>
                         </div>
                       ) : (
@@ -114,6 +193,7 @@ export default function Encyclopedia() {
           <div className="grid">
             {filteredTechniques.map((tech, index) => {
               const isLocked = config.features.techniquesLimit !== -1 && index >= config.features.techniquesLimit;
+              const requiredTier = index >= ACCESS_CONFIGS.PRO.features.techniquesLimit ? 'PREMIUM' : 'PRO';
 
               return (
                 <div 
@@ -121,16 +201,16 @@ export default function Encyclopedia() {
                   className={`card tech-card glass ${isLocked ? 'locked' : 'clickable'}`}
                   onClick={() => handleItemClick(tech, isLocked)}
                 >
-                   {isLocked ? (
+                  {isLocked ? (
                     <div className="lock-overlay">
-                      <span className="lock-icon">🔒</span>
-                      <p>Protocolo Premium</p>
+                      <span className="lock-icon">Bloqueado</span>
+                      <p>Disponible en {requiredTier}</p>
                       <Link href="/pricing" className="unlock-link">Mejorar Cuenta</Link>
                     </div>
                   ) : (
                     <>
                       <div className="card-head">
-                        <span className={`diff-tag ${tech.difficulty.toLowerCase()}`}>{tech.difficulty}</span>
+                        <span className={`diff-tag ${cssKey(tech.difficulty)}`}>{tech.difficulty}</span>
                         <h3>{tech.name}</h3>
                       </div>
                       <p className="desc">{tech.description}</p>
@@ -162,14 +242,14 @@ export default function Encyclopedia() {
         .library-header h1 { font-size: 5rem; margin-bottom: 15px; }
 
         .tier-switcher { position: absolute; top: 0; right: 0; padding: 10px; border-radius: 15px; display: flex; gap: 10px; align-items: center; border: 1px solid var(--border); }
-        .tier-switcher button { background: none; border: 1px solid var(--border); color: white; padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 0.7rem; }
+        .tier-switcher button { background: none; border: 1px solid var(--border); color: var(--foreground); padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 0.7rem; }
         .tier-switcher button.active { background: var(--primary); border-color: var(--primary); }
         .tier-switcher small { font-size: 0.6rem; opacity: 0.5; font-weight: 800; }
 
         .user-tier-badge { display: inline-block; background: var(--primary); color: white; padding: 4px 15px; border-radius: 20px; font-size: 0.7rem; font-weight: 800; margin-bottom: 20px; box-shadow: var(--neon-shadow); }
         .description { opacity: 0.6; max-width: 800px; margin: 0 auto 50px; font-size: 1.2rem; line-height: 1.6; }
         
-        .search-input { width: 100%; max-width: 800px; padding: 25px 40px; border-radius: 50px; font-size: 1.2rem; color: white; outline: none; transition: var(--transition); background: rgba(255,255,255,0.03); }
+        .search-input { width: 100%; max-width: 800px; padding: 25px 40px; border-radius: 50px; font-size: 1.2rem; color: var(--foreground); outline: none; transition: var(--transition); background: var(--card-bg); border: 1px solid var(--border); }
         .search-input:focus { box-shadow: 0 0 40px var(--primary-glow); border-color: var(--primary); }
         
         .library-nav { display: flex; justify-content: center; gap: 30px; margin-top: 50px; }
@@ -213,3 +293,4 @@ export default function Encyclopedia() {
     </div>
   );
 }
+

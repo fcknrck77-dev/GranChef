@@ -26,7 +26,7 @@ export default function LockedOverlay({ requiredTier, onUnlock }: LockedOverlayP
       </div>
       {showTooltip && (
         <div className="tier-tooltip">
-          🔒 Disponible en plan <strong>{requiredTier}</strong>
+          Disponible en plan <strong>{requiredTier}</strong>
         </div>
       )}
       <style jsx>{`

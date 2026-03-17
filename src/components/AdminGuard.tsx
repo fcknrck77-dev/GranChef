@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import { useAdminAuth } from '@/context/AdminAuthContext';
@@ -27,9 +27,10 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
       <div className="admin-login-overlay">
         <div className="login-card glass">
           <div className="lock-header">
-            <span className="icon">🔒</span>
-            <h2>ACCESO PROPIETARIO</h2>
-            <p>Identificación necesaria para la gestión del laboratorio.</p>
+            <span className="icon">ADMIN</span>
+            <h2>ACCESO DE ADMINISTRADOR</h2>
+            <p>Identificación necesaria para acceder al panel.</p>
+            <p className="hint">Usa las credenciales configuradas en <code>.env.local</code> (ADMIN_USER / ADMIN_PASS).</p>
           </div>
           
           <form onSubmit={handleSubmit}>
@@ -50,7 +51,7 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
               <label>CONTRASEÑA</label>
               <input 
                 type="password" 
-                placeholder="Clave de encriptación..." 
+                placeholder="Clave de acceso..." 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className={error ? 'error' : ''}
@@ -70,7 +71,7 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
           .admin-login-overlay {
             position: fixed;
             inset: 0;
-            background: #000;
+            background: var(--overlay-backdrop);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -82,13 +83,17 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
             max-width: 420px;
             padding: 50px;
             border-radius: 30px;
-            border: 1px solid var(--border);
+            border: 1px solid var(--modal-border);
             text-align: center;
+            background: var(--modal-surface);
+            color: var(--modal-text);
           }
 
           .lock-header .icon { font-size: 2.5rem; display: block; margin-bottom: 15px; }
           h2 { font-size: 1.2rem; letter-spacing: 4px; color: var(--primary); margin-bottom: 5px; }
-          p { opacity: 0.4; font-size: 0.8rem; margin-bottom: 40px; }
+          p { opacity: 0.8; color: var(--modal-muted); font-size: 0.8rem; margin-bottom: 40px; }
+          .hint { opacity: 0.55; font-size: 0.75rem; margin: -25px 0 35px; line-height: 1.4; }
+          .hint code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace; font-size: 0.75rem; opacity: 0.9; }
 
           .input-group { text-align: left; margin-bottom: 25px; }
           .input-group label { display: block; font-size: 0.65rem; font-weight: 900; opacity: 0.4; margin-bottom: 8px; letter-spacing: 1px; }
@@ -96,10 +101,10 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
           input {
             width: 100%;
             padding: 15px 20px;
-            background: rgba(255,255,255,0.03);
-            border: 1px solid var(--border);
+            background: var(--modal-surface-2);
+            border: 1px solid var(--modal-border);
             border-radius: 12px;
-            color: white;
+            color: var(--modal-text);
             font-size: 1rem;
             outline: none;
             transition: all 0.3s ease;
@@ -138,3 +143,4 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
 
   return <>{children}</>;
 }
+

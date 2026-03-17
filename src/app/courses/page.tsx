@@ -11,49 +11,18 @@ import { Timer, Sparkles, ChevronRight } from 'lucide-react';
 import LockedOverlay from '@/components/LockedOverlay';
 
 export default function Courses() {
-  const { getEffectiveLevel, accountAgeInDays, authState, openAuthModal } = useUserAuth();
+  const { getEffectiveLevel, accountAgeInDays, requireAuth } = useUserAuth();
   const { isAdmin } = useAdminAuth();
   const displayAge = Math.max(1, accountAgeInDays);
   const [filter, setFilter] = useState('All');
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  const [selectedCourseLoading, setSelectedCourseLoading] = useState(false);
   const [dbCourses, setDbCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const FALLBACK_COURSES: any[] = [
-    { id: 'f1', title: 'Introducción a la Esferificación Básica', description: 'Aprende los fundamentos de la cocina molecular con la técnica que revolutionó la gastronomía. Alginato de sodio y calcio en acción.', instructor: 'Chef Ferran Adrià (Homenaje)', category: 'Técnicas', tier: 'FREE', days_required: 1, readingTime: '15 min', publishedAt: '15/03/2026', modules: [] },
-    { id: 'f2', title: 'Bases de la Gelificación: Agar-Agar y Gelatina', description: 'Comparativa exhaustiva de agentes gelificantes, sus temperaturas de activación y casos de uso en la cocina de vanguardia.', instructor: 'Chef Heston Blumenthal', category: 'Técnicas', tier: 'FREE', days_required: 1, readingTime: '20 min', publishedAt: '15/03/2026', modules: [] },
-    { id: 'f3', title: 'El Huevo: Ciencia y Precisión', description: 'Análisis completo de las proteínas del huevo y cómo la temperatura controla su textura. Cocción a 63ºC, 65ºC y 68ºC.', instructor: 'Chef Joan Roca', category: 'Técnicas', tier: 'FREE', days_required: 1, readingTime: '18 min', publishedAt: '15/03/2026', modules: [] },
-    { id: 'f4', title: 'Arquitectura del Sabor: Compuestos Aromáticos', description: 'MasterClass sobre moléculas de aroma, familias de terpenos y cómo usarlos para crear maridajes perfectos basados en química.', instructor: 'Chef François Chartier', category: 'Creatividad', tier: 'PRO', days_required: 1, readingTime: '35 min', publishedAt: '15/03/2026', modules: [] },
-    { id: 'f5', title: 'Soportes Estructurales y Gelificación Avanzada', description: 'Dominio de hidrocoloides para crear estructuras imposibles: geles calientes, espumas frías y membranas comestibles.', instructor: 'Chef Joan Roca', category: 'Técnicas', tier: 'PRO', days_required: 1, readingTime: '30 min', publishedAt: '15/03/2026', modules: [] },
-    { id: 'f6', title: 'Cromatografía Gastronómica', description: 'Cómo la ciencia de las moléculas aromáticas define el maridaje. El método científico aplicado al diseño de menú.', instructor: 'Chef François Chartier', category: 'Creatividad', tier: 'PREMIUM', days_required: 1, readingTime: '60 min', publishedAt: '15/03/2026', modules: [] },
-    { id: 'f7', title: 'Cocción al Vacío: Sous-Vide Mastery', description: 'Protocolo completo para dominar el sous-vide: tablas de temperatura, tiempos exactos y técnicas de seguridad alimentaria.', instructor: 'Chef Thomas Keller', category: 'Técnicas', tier: 'FREE', days_required: 2, readingTime: '25 min', publishedAt: '16/03/2026', modules: [] },
-    { id: 'f8', title: 'Emulsiones: De la Mayonesa al Aceite de Oliva en Polvo', description: 'Física de las emulsiones, agentes emulsionantes naturales y técnicas moleculares para crear texturas inéditas.', instructor: 'Chef Ferran Adrià', category: 'Técnicas', tier: 'PRO', days_required: 3, readingTime: '40 min', publishedAt: '17/03/2026', modules: [] },
-    { id: 'f9', title: 'Nitrógeno Líquido en la Cocina', description: 'Aplicaciones del nitrógeno líquido a -196ºC: heladería ultrarrápida, criofrituras, polvo de alcohol y más.', instructor: 'Chef Heston Blumenthal', category: 'Técnicas', tier: 'PREMIUM', days_required: 4, readingTime: '50 min', publishedAt: '18/03/2026', modules: [] },
-    { id: 'f10', title: 'Aceites Infusionados: Control de Temperatura y Sabor', description: 'Técnicas de infusión en frío y en caliente para extraer aromas. El aceite como vehículo de sabores complejos.', instructor: 'Chef René Redzepi', category: 'Ingredientes', tier: 'FREE', days_required: 5, readingTime: '20 min', publishedAt: '19/03/2026', modules: [] },
-    { id: 'f11', title: 'Fermentación Controlada: Kimchi, Miso y Koji', description: 'El mundo de los fermentados: bacterias, levaduras, mohos y cómo controlar el proceso para resultados culinarios excepcionales.', instructor: 'Chef René Redzepi', category: 'Ingredientes', tier: 'PRO', days_required: 6, readingTime: '45 min', publishedAt: '20/03/2026', modules: [] },
-    { id: 'f12', title: 'Trufa Negra: El Diamante de la Gastronomía', description: 'Historia, variedades, conservación y técnicas de uso de la trufa negra melanosporum. La ciencia detrás de sus aromas.', instructor: 'Chef Joël Robuchon (Homenaje)', category: 'Ingredientes', tier: 'PREMIUM', days_required: 7, readingTime: '55 min', publishedAt: '21/03/2026', modules: [] },
-    { id: 'f13', title: 'Técnicas de Corte y Cuchillería Japonesa', description: 'El arte del Kiri: filosofía japonesa del corte, tipos de cuchillos, ángulos de afilado y geometría del filo.', instructor: 'Chef Jiro Ono', category: 'Técnicas', tier: 'FREE', days_required: 8, readingTime: '22 min', publishedAt: '22/03/2026', modules: [] },
-    { id: 'f14', title: 'El Umami: Quinto Sabor y Sinergias Moleculares', description: 'Glutamato, inosinato y guanilato. La sinergia del umami y cómo potenciar cada plato con ingredientes ricos en sabor.', instructor: 'Chef Yoshihiro Iizuka', category: 'Ingredientes', tier: 'PRO', days_required: 9, readingTime: '38 min', publishedAt: '23/03/2026', modules: [] },
-    { id: 'f15', title: 'Destilación y Rotovapor: Aromas Puros', description: 'Uso del rotovaporizador a presión reducida para capturar esencias volátiles de ingredientes únicos. Cocina de autor.', instructor: 'Chef Albert Adrià', category: 'Técnicas', tier: 'PREMIUM', days_required: 10, readingTime: '65 min', publishedAt: '24/03/2026', modules: [] },
-    { id: 'f16', title: 'Azúcar y Caramelización: Química del Dulce', description: 'Los 5 estadios del azúcar, la reacción de Maillard vs caramelización y técnicas de trabajado en caliente.', instructor: 'Chef Pierre Hermé', category: 'Técnicas', tier: 'FREE', days_required: 11, readingTime: '28 min', publishedAt: '25/03/2026', modules: [] },
-    { id: 'f17', title: 'Caviar de Producción: Esferificación Avanzada', description: 'Protocolo de producción de "caviar sintético" en volumen. Estabilidad de las esferas, variables críticas.', instructor: 'Chef Ferran Adrià', category: 'Técnicas', tier: 'PRO', days_required: 12, readingTime: '42 min', publishedAt: '26/03/2026', modules: [] },
-    { id: 'f18', title: 'Cocina Nórdica: Fermentos, Mar y Bosque', description: 'La revolución nórdica: forrajeo, fermentación y la estética del plato minimalista. El mundo de Noma.', instructor: 'Chef René Redzepi', category: 'Creatividad', tier: 'PREMIUM', days_required: 13, readingTime: '70 min', publishedAt: '27/03/2026', modules: [] },
-    { id: 'f19', title: 'Especias: Historia, Química y Maridaje', description: 'De la Ruta de la Seda a la ciencia moderna. Perfil molecular de 20 especias fundamentales y sus combinaciones.', instructor: 'Chef Yotam Ottolenghi', category: 'Ingredientes', tier: 'FREE', days_required: 14, readingTime: '32 min', publishedAt: '28/03/2026', modules: [] },
-    { id: 'f20', title: 'Cocina al Fuego Directo: Maillard Extremo', description: 'La ciencia del grill: temperatura, colágeno, grasa y la reacción de Maillard para costrificar en segundos.', instructor: 'Chef Francis Mallmann', category: 'Técnicas', tier: 'PRO', days_required: 15, readingTime: '33 min', publishedAt: '01/04/2026', modules: [] },
-    { id: 'f21', title: 'Chocolate: Templado, Cristales y Couverture', description: 'Los 6 tipos de cristales del cacao, la curva de templado y técnicas avanzadas de moldeado y acabado.', instructor: 'Chef Cédric Grolet', category: 'Técnicas', tier: 'PREMIUM', days_required: 16, readingTime: '80 min', publishedAt: '02/04/2026', modules: [] },
-    { id: 'f22', title: 'Plancton Marino: El Sabor del Océano', description: 'Propiedades del tetraselmis chuii, su composición nutricional y técnicas de uso en cocina de vanguardia.', instructor: 'Chef Ángel León', category: 'Ingredientes', tier: 'FREE', days_required: 17, readingTime: '24 min', publishedAt: '03/04/2026', modules: [] },
-    { id: 'f23', title: 'Pastelería Molecular: Trompe-l\'oeil', description: 'El arte del engaño visual: cómo crear réplicas perfectas de frutas, piedras e insectos comestibles con técnica pura.', instructor: 'Chef Cédric Grolet', category: 'Creatividad', tier: 'PRO', days_required: 18, readingTime: '55 min', publishedAt: '04/04/2026', modules: [] },
-    { id: 'f24', title: 'Bebidas y Cocktails Moleculares', description: 'Aplicación de técnicas de vanguardia a la coctelería: esferas de Negroni, niebla de bergamota y gelatinas de Gin Tonic.', instructor: 'Chef Albert Adrià', category: 'Creatividad', tier: 'PREMIUM', days_required: 19, readingTime: '60 min', publishedAt: '05/04/2026', modules: [] },
-    { id: 'f25', title: 'Carne: Maduración Seca y Húmeda', description: 'La ciencia de la maduración: proteolisis, lipolisis, hongos proteolíticos y cómo lograr el mejor sabor.', instructor: 'Chef Heston Blumenthal', category: 'Ingredientes', tier: 'FREE', days_required: 20, readingTime: '27 min', publishedAt: '06/04/2026', modules: [] },
-    { id: 'f26', title: 'Sabores del Mundo: Mapa Molecular Global', description: 'Un atlas de perfiles de sabor regionales. Por qué la cocina mexicana combina perfectamente con ciertas especias.', instructor: 'Chef Nobu Matsuhisa', category: 'Creatividad', tier: 'PRO', days_required: 21, readingTime: '48 min', publishedAt: '07/04/2026', modules: [] },
-    { id: 'f27', title: 'Algas: El Futuro Verde de la Cocina', description: 'Kombu, wakame, nori y espirulina. Cocina con algas: maridaje, texturas y beneficios nutricionales.', instructor: 'Chef Ángel León', category: 'Ingredientes', tier: 'PREMIUM', days_required: 22, readingTime: '58 min', publishedAt: '08/04/2026', modules: [] },
-    { id: 'f28', title: 'Deshidratación y Crispy: Texturas Crujientes', description: 'Deshidratadores, liofilización y horno de convección. Cómo conseguir el crujiente perfecto y preservar aromas.', instructor: 'Chef René Redzepi', category: 'Técnicas', tier: 'FREE', days_required: 23, readingTime: '21 min', publishedAt: '09/04/2026', modules: [] },
-    { id: 'f29', title: 'Pain de Cuisine: Pan Artesano y Fermentación', description: 'La microbiología de la masa madre, fermentación lenta y técnicas de horneado para cortezas perfectas.', instructor: 'Chef Eric Kayser', category: 'Técnicas', tier: 'PRO', days_required: 24, readingTime: '44 min', publishedAt: '10/04/2026', modules: [] },
-    { id: 'f30', title: 'Fotografía Culinaria y Plating de Alta Cocina', description: 'Geometría del plato, uso del espacio negativo, paleta cromática y técnicas de fotografía gastronómica profesional.', instructor: 'Chef Grant Achatz', category: 'Creatividad', tier: 'PREMIUM', days_required: 25, readingTime: '75 min', publishedAt: '11/04/2026', modules: [] },
-    { id: 'f31', title: 'Gestión Culinaria: Diseño de Menú y Costes', description: 'Cómo diseñar un menú degustación rentable. Food cost, escandallos y la psicología de precios en restaurantes Michelin.', instructor: 'Chef Joël Robuchon (Homenaje)', category: 'Gestión', tier: 'FREE', days_required: 26, readingTime: '30 min', publishedAt: '12/04/2026', modules: [] },
-  ];
-
   const userLevel = getEffectiveLevel();
+
+  const effectiveLevel: AccessLevel = isAdmin ? 'ADMIN' : userLevel;
 
   useEffect(() => {
     async function fetchCourses() {
@@ -67,7 +36,8 @@ export default function Courses() {
       try {
         const { data, error } = await supabase
           .from('courses')
-          .select('*')
+          // Do not fetch modules on initial load: seeded courses are long (thousands of words).
+          .select('id,title,description,instructor,category,tier,days_required,created_at')
           .order('days_required', { ascending: true });
         
         if (error || !data || data.length === 0) {
@@ -76,8 +46,8 @@ export default function Courses() {
         } else {
           const mapped = data.map((c: any) => ({
             ...c,
-            readingTime: c.reading_time,
-            publishedAt: new Date(c.created_at).toLocaleDateString()
+            publishedAt: new Date(c.created_at).toLocaleDateString('es-ES'),
+            modules: []
           }));
           setDbCourses(mapped);
         }
@@ -88,6 +58,95 @@ export default function Courses() {
     }
     fetchCourses();
   }, []);
+
+  async function ensureCourseModules(course: Course): Promise<Course> {
+    if (course.modules && course.modules.length > 0) return course;
+    const supabase = getSupabase();
+    if (!supabase) return course;
+    const { data, error } = await supabase.from('courses').select('modules').eq('id', course.id).maybeSingle();
+    if (error || !data) return course;
+    return { ...course, modules: Array.isArray((data as any).modules) ? (data as any).modules : [] };
+  }
+
+  async function exportCoursePdf(course: Course) {
+    const modules = course.modules || [];
+    const rawText = modules
+      .map((m) => `${m.title}\n\n${m.content}`)
+      .join('\n\n\n')
+      .replace(/\r/g, '');
+
+    // Lazy-load dependency only when needed.
+    const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
+    const pdfDoc = await PDFDocument.create();
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const mono = await pdfDoc.embedFont(StandardFonts.Courier);
+
+    const pageMargin = 48;
+    const fontSizeTitle = 18;
+    const fontSizeBody = 10;
+    const lineHeight = 14;
+
+    const wrapText = (text: string, maxWidth: number, fnt: any, size: number) => {
+      const words = text.split(/\s+/).filter(Boolean);
+      const lines: string[] = [];
+      let line = '';
+      for (const w of words) {
+        const candidate = line ? `${line} ${w}` : w;
+        const width = fnt.widthOfTextAtSize(candidate, size);
+        if (width <= maxWidth) {
+          line = candidate;
+          continue;
+        }
+        if (line) lines.push(line);
+        line = w;
+      }
+      if (line) lines.push(line);
+      return lines;
+    };
+
+    const addPage = () => pdfDoc.addPage([595.28, 841.89]); // A4
+    let page = addPage();
+    let y = page.getHeight() - pageMargin;
+    const x = pageMargin;
+    const maxWidth = page.getWidth() - pageMargin * 2;
+
+    const drawLine = (text: string, fnt: any, size: number, color = rgb(0.1, 0.1, 0.1)) => {
+      page.drawText(text, { x, y, size, font: fnt, color });
+      y -= lineHeight;
+      if (y < pageMargin) {
+        page = addPage();
+        y = page.getHeight() - pageMargin;
+      }
+    };
+
+    // Header
+    drawLine(course.title, font, fontSizeTitle, rgb(0, 0, 0));
+    drawLine(`Plan: ${course.tier}  |  Categoria: ${course.category}  |  Por Grand Chef`, mono, 10, rgb(0.2, 0.2, 0.2));
+    drawLine(`Exportado: ${new Date().toLocaleString('es-ES')}`, mono, 10, rgb(0.2, 0.2, 0.2));
+    y -= 10;
+
+    // Body
+    for (const block of rawText.split(/\n{2,}/)) {
+      const trimmed = block.trim();
+      if (!trimmed) continue;
+      const lines = wrapText(trimmed, maxWidth, font, fontSizeBody);
+      for (const ln of lines) drawLine(ln, font, fontSizeBody, rgb(0.05, 0.05, 0.05));
+      y -= 6;
+    }
+
+    const bytes = await pdfDoc.save();
+    // pdf-lib returns Uint8Array; convert to a real ArrayBuffer slice for DOM Blob typing.
+    const ab = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+    const blob = new Blob([ab as unknown as BlobPart], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${course.title.replace(/[\\/:*?"<>|]+/g, '').slice(0, 80) || 'curso'}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
 
   const filteredCourses = filter === 'All' 
     ? dbCourses 
@@ -121,7 +180,8 @@ export default function Courses() {
            <div className="loading-state">Cargando biblioteca...</div>
         ) : filteredCourses.map(course => {
           const daysReq = course.days_required || 0;
-          const isReleased = daysReq <= displayAge;
+          // Admin should be able to review any day/course immediately.
+          const isReleased = isAdmin ? true : daysReq <= displayAge;
           const hasTierAccess = isAdmin ||
                                userLevel === 'ADMIN' || 
                                (course.tier === 'FREE') || 
@@ -135,17 +195,24 @@ export default function Courses() {
             <div 
               key={course.id} 
               className={`course-card glass ${lockedByTier ? 'locked-tier' : ''} ${comingSoon ? 'coming-soon' : ''}`} 
-              onClick={() => {
+              onClick={async () => {
+                if (!requireAuth()) return;
                 if (comingSoon) {
-                  alert(`Este contenido se desbloqueará el Día ${daysReq} de tu entrenamiento. ¡Sigue aprendiendo!`);
+                  alert(`Este contenido se desbloqueará el Día ${daysReq} de tu entrenamiento. Sigue aprendiendo.`);
                   return;
                 }
                 if (lockedByTier) {
-                  if (!authState.isRegistered) openAuthModal();
-                  else window.location.href = '/pricing';
+                  requireAuth(() => { window.location.href = '/pricing'; });
                   return;
                 }
+                setSelectedCourseLoading(true);
                 setSelectedCourse(course);
+                try {
+                  const full = await ensureCourseModules(course);
+                  setSelectedCourse(full);
+                } finally {
+                  setSelectedCourseLoading(false);
+                }
               }}
             >
               {comingSoon && (
@@ -159,18 +226,17 @@ export default function Courses() {
               {lockedByTier && (
                 <LockedOverlay
                   requiredTier={(course.tier === 'PREMIUM' ? 'PREMIUM' : 'PRO') as 'PRO' | 'PREMIUM'}
-                  onUnlock={() => { if (!authState.isRegistered) openAuthModal(); else window.location.href = '/pricing'; }}
+                  onUnlock={() => requireAuth(() => { window.location.href = '/pricing'; })}
                 />
               )}
 
               <div className="card-top">
                 <span className={`tier-pill ${course.tier.toLowerCase()}`}>{course.tier}</span>
-                <span className="reading-time">📖 {course.readingTime}</span>
               </div>
-              
+               
               <div className="course-main">
                 <div className="flex justify-between items-start">
-                  <span className="instructor">{course.instructor}</span>
+                  <span className="instructor">Por Grand Chef</span>
                 </div>
                 <h3>{course.title}</h3>
                 <p>{course.description}</p>
@@ -182,8 +248,7 @@ export default function Courses() {
                   <button 
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (!authState.isRegistered) openAuthModal();
-                      else window.location.href = '/pricing';
+                      requireAuth(() => { window.location.href = '/pricing'; });
                     }}
                     className="lock-link flex items-center gap-2"
                   >
@@ -203,41 +268,55 @@ export default function Courses() {
       {selectedCourse && (
         <div className="reader-overlay animate-fadeIn" onClick={() => setSelectedCourse(null)}>
           <div className="reader-modal glass neon-border animate-slideUp" onClick={e => e.stopPropagation()}>
-            <button className="close-reader" onClick={() => setSelectedCourse(null)}>×</button>
+            <button className="close-reader" onClick={() => setSelectedCourse(null)}>X</button>
             
             <article className="reading-content">
               <header className="reader-header">
                 <div className="header-top">
                   <span className="reader-cat">{selectedCourse.category}</span>
                   <div className="action-buttons">
-                    {(userLevel === 'PRO' || userLevel === 'PREMIUM' || userLevel === 'ADMIN') && (
-                      <button 
-                        className="export-btn print-btn" 
+                    {(effectiveLevel === 'PREMIUM' || effectiveLevel === 'ADMIN') && (
+                      <button
+                        className="export-btn print-btn"
                         onClick={() => {
                           document.body.classList.add('print-authorized');
                           window.print();
                           setTimeout(() => document.body.classList.remove('print-authorized'), 1000);
                         }}
                       >
-                        <span>🖨️ Imprimir</span>
+                        <span>Imprimir</span>
                       </button>
                     )}
-                    {(userLevel === 'PREMIUM' || userLevel === 'ADMIN') && (
-                      <button className="export-btn" onClick={() => alert('Generando PDF corporativo encriptado...')}>
-                        <span>📄 Exportar a PDF</span>
+                    {(effectiveLevel === 'PRO' || effectiveLevel === 'PREMIUM' || effectiveLevel === 'ADMIN') && (
+                      <button
+                        className="export-btn"
+                        onClick={async () => {
+                          const full = await ensureCourseModules(selectedCourse);
+                          if (!full.modules || full.modules.length === 0) {
+                            alert('Este curso aun no tiene contenido cargado.');
+                            return;
+                          }
+                          await exportCoursePdf(full);
+                        }}
+                      >
+                        <span>Exportar PDF</span>
                       </button>
                     )}
                   </div>
                 </div>
                 <h2>{selectedCourse.title}</h2>
                 <div className="reader-meta">
-                  <span>Por {selectedCourse.instructor}</span>
-                  <span className="separator">|</span>
-                  <span>Lectura estimada: {selectedCourse.readingTime}</span>
+                  <span>Por Grand Chef</span>
                 </div>
               </header>
 
-              {selectedCourse.modules.map(module => (
+              {selectedCourseLoading ? (
+                <section className="reader-section">
+                  <div className="text-block">
+                    <p>Cargando contenido...</p>
+                  </div>
+                </section>
+              ) : (selectedCourse.modules || []).map(module => (
                 <section key={module.id} className="reader-section">
                   <h3>{module.title}</h3>
                   <div className="text-block">
@@ -322,7 +401,6 @@ export default function Courses() {
         .tier-pill.free { background: rgba(0,255,136,0.1); color: #00ff88; }
         .tier-pill.pro { background: rgba(0,242,255,0.1); color: #00f2ff; }
         .tier-pill.premium { background: rgba(255,0,85,0.1); color: #ff0055; }
-        .reading-time { font-size: 0.85rem; opacity: 0.5; font-weight: 600; }
 
         .course-main { flex: 1; }
         .instructor { font-size: 0.75rem; color: var(--primary); font-weight: 800; text-transform: uppercase; letter-spacing: 2px; display: block; margin-bottom: 12px; }
@@ -335,30 +413,29 @@ export default function Courses() {
         .read-btn:hover { background: var(--primary); color: black; box-shadow: var(--neon-shadow); }
         .lock-link { color: var(--primary); font-weight: 900; text-decoration: none; font-size: 0.9rem; text-transform: uppercase; background: none; border: none; cursor: pointer; padding: 0; }
         .lock-link:hover { text-shadow: var(--neon-shadow); }
-        .wait-badge { font-size: 0.8rem; font-weight: 900; color: white; opacity: 0.5; text-transform: uppercase; }
+        .wait-badge { font-size: 0.8rem; font-weight: 900; color: var(--foreground); opacity: 0.6; text-transform: uppercase; }
 
         /* Reader Mode */
-        .reader-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.95); backdrop-filter: blur(20px); z-index: 2000; display: flex; justify-content: center; padding: 0; }
-        .reader-modal { width: 100%; max-width: 900px; height: 100vh; overflow-y: auto; background: #080808; position: relative; padding: 100px 80px; border-inline: 1px solid rgba(255,255,255,0.05); }
-        .close-reader { position: fixed; top: 40px; right: 40px; background: rgba(255,255,255,0.05); border: none; color: white; width: 60px; height: 60px; border-radius: 50%; font-size: 2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.3s; z-index: 2100; }
+        .reader-overlay { position: fixed; inset: 0; background: var(--overlay-backdrop); backdrop-filter: blur(20px); z-index: 2000; display: flex; justify-content: center; padding: 0; }
+        .reader-modal { width: 100%; max-width: 900px; height: 100vh; overflow-y: auto; background: var(--modal-surface); color: var(--modal-text); position: relative; padding: 100px 80px; border-inline: 1px solid var(--modal-border); }
+        .close-reader { position: fixed; top: 40px; right: 40px; background: var(--modal-surface-2); border: 1px solid var(--modal-border); color: var(--modal-text); width: 60px; height: 60px; border-radius: 50%; font-size: 2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.3s; z-index: 2100; }
         .close-reader:hover { background: var(--primary); color: black; transform: rotate(90deg); }
 
         .reading-content { max-width: 700px; margin-inline: auto; }
-        .reader-header { margin-bottom: 80px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 40px; }
+        .reader-header { margin-bottom: 80px; border-bottom: 1px solid var(--modal-border); padding-bottom: 40px; }
         .header-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
         .action-buttons { display: flex; gap: 10px; }
-        .export-btn { background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: white; padding: 8px 15px; border-radius: 8px; cursor: pointer; transition: 0.3s; font-size: 0.8rem; font-weight: bold; }
+        .export-btn { background: var(--modal-surface-2); border: 1px solid var(--modal-border); color: var(--modal-text); padding: 8px 15px; border-radius: 8px; cursor: pointer; transition: 0.3s; font-size: 0.8rem; font-weight: bold; }
         .export-btn:hover { background: var(--primary); color: black; border-color: var(--primary); }
         .print-btn:hover { background: #00f2ff; border-color: #00f2ff; }
         .reader-cat { font-size: 0.9rem; color: var(--primary); font-weight: 800; text-transform: uppercase; letter-spacing: 4px; display: block; }
-        .reader-header h2 { font-size: 4rem; font-weight: 900; margin-bottom: 30px; line-height: 1.1; color: white; }
-        .reader-meta { display: flex; gap: 20px; font-size: 1.1rem; opacity: 0.5; font-style: italic; color: white; }
+        .reader-header h2 { font-size: 4rem; font-weight: 900; margin-bottom: 30px; line-height: 1.1; color: var(--modal-text); }
+        .reader-meta { display: flex; gap: 20px; font-size: 1.1rem; opacity: 0.85; font-style: italic; color: var(--modal-muted); }
         .separator { opacity: 0.2; }
 
         .reader-section { margin-bottom: 80px; }
-        .reader-section h3 { font-size: 2rem; color: white; margin-bottom: 30px; font-weight: 800; }
-        .text-block p { font-size: 1.4rem; line-height: 1.8; opacity: 0.85; margin-bottom: 30px; text-align: justify; color: white; }
-        .text-block p::first-letter { font-size: 3rem; color: var(--primary); float: left; margin-right: 15px; font-weight: 900; line-height: 1; margin-top: 5px; }
+        .reader-section h3 { font-size: 2rem; color: var(--modal-text); margin-bottom: 30px; font-weight: 800; }
+        .text-block p { font-size: 1.4rem; line-height: 1.8; opacity: 0.95; margin-bottom: 30px; text-align: justify; color: var(--modal-text); }
 
         .reader-footer { margin-top: 100px; padding-top: 60px; border-top: 2px solid var(--primary); text-align: center; }
         .reader-footer p { font-size: 0.9rem; opacity: 0.4; font-style: italic; margin-bottom: 40px; max-width: 500px; margin-inline: auto; }
@@ -383,3 +460,4 @@ export default function Courses() {
     </div>
   );
 }
+

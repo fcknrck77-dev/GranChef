@@ -9,14 +9,16 @@ export async function POST(req: Request) {
   const expectedUser = process.env.ADMIN_USER || '';
   const expectedPass = process.env.ADMIN_PASS || '';
 
-  if (!expectedUser || !expectedPass) {
-    return NextResponse.json({ error: 'Admin server credentials not configured' }, { status: 500 });
-  }
+  // Preview/dev: allow admin/admin only when env credentials are not set.
+  // If you have ADMIN_USER/ADMIN_PASS configured, we require them (safer even in preview).
+  const allowDevDefault = process.env.NODE_ENV !== 'production' && !(expectedUser && expectedPass);
+  const devOk = allowDevDefault && username === 'admin' && password === 'admin';
+  const envOk = Boolean(expectedUser && expectedPass) && username === expectedUser && password === expectedPass;
 
-  if (username !== expectedUser || password !== expectedPass) {
+  if (!envOk && !devOk) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }
 
-  await setAdminSession(username);
+  await setAdminSession(envOk ? username : 'admin');
   return NextResponse.json({ ok: true });
 }

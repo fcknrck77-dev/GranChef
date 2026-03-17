@@ -1,6 +1,8 @@
 'use client';
 
 import Link from 'next/link';
+import { FlaskConical, BookOpen, GraduationCap } from 'lucide-react';
+import { appHref } from '@/lib/appHref';
 
 export default function Home() {
   return (
@@ -12,8 +14,8 @@ export default function Home() {
             <h1 className="neon-text">Precision <span className="highlight">Gastronomy</span></h1>
             <p>La herramienta definitiva de análisis molecular y experimentación para los arquitectos del sabor contemporáneo.</p>
             <div className="hero-actions">
-              <Link href="/laboratory" className="btn btn-primary">Entrar al Laboratorio</Link>
-              <Link href="/encyclopedia" className="btn btn-secondary">Explorar Enciclopedia</Link>
+              <Link href={appHref('/laboratory')} className="btn btn-primary">Entrar al Laboratorio</Link>
+              <Link href={appHref('/encyclopedia')} className="btn btn-secondary">Explorar Enciclopedia</Link>
             </div>
           </div>
         </div>
@@ -30,24 +32,24 @@ export default function Home() {
           </div>
           <div className="grid">
             <div className="card feature-card glass">
-              <div className="card-icon">🧪</div>
+              <div className="card-icon" aria-hidden="true"><FlaskConical size={30} /></div>
               <h3>Laboratorio Molecular</h3>
               <p>Simula reacciones aromáticas basadas en perfiles químicos reales extraídos de la ciencia del foodpairing.</p>
-              <Link href="/laboratory" className="learn-more">Iniciar Simulación →</Link>
+              <Link href={appHref('/laboratory')} className="learn-more">Iniciar Simulación</Link>
             </div>
             
             <div className="card feature-card glass">
-              <div className="card-icon">📖</div>
+              <div className="card-icon" aria-hidden="true"><BookOpen size={30} /></div>
               <h3>Enciclopedia de Sabores</h3>
               <p>Acceso a la base de datos más profunda de maridajes y notas de cata literarias de Niki Segnit.</p>
-              <Link href="/encyclopedia" className="learn-more">Consultar Archivo →</Link>
+              <Link href={appHref('/encyclopedia')} className="learn-more">Consultar Archivo</Link>
             </div>
 
             <div className="card feature-card glass">
-              <div className="card-icon">🏫</div>
+              <div className="card-icon" aria-hidden="true"><GraduationCap size={30} /></div>
               <h3>Master Classes</h3>
               <p>Técnicas de vanguardia explicadas por simulaciones de los chefs más disruptivos del mundo.</p>
-              <Link href="/courses" className="learn-more">Ver Cursos →</Link>
+              <Link href={appHref('/courses')} className="learn-more">Ver Cursos</Link>
             </div>
           </div>
         </div>
@@ -63,17 +65,17 @@ export default function Home() {
             <div className="tier-card glass">
               <h3>FREE</h3>
               <p className="price">0€</p>
-              <Link href="/pricing" className="btn-link">Explorar →</Link>
+              <Link href="/pricing" className="btn-link">Explorar</Link>
             </div>
             <div className="tier-card glass featured">
               <h3>PRO</h3>
               <p className="price">19€</p>
-              <Link href="/pricing" className="btn-link">Desbloquear →</Link>
+              <Link href="/pricing" className="btn-link">Desbloquear</Link>
             </div>
             <div className="tier-card glass">
               <h3>PREMIUM</h3>
               <p className="price">49€</p>
-              <Link href="/pricing" className="btn-link">Dominar →</Link>
+              <Link href="/pricing" className="btn-link">Dominar</Link>
             </div>
           </div>
         </div>

@@ -22,7 +22,8 @@ export default function Footer() {
           margin-top: 100px;
           border-top: 1px solid var(--border);
           padding: 60px 0;
-          background: rgba(0,0,0,0.5);
+          background: var(--modal-surface);
+          color: var(--foreground);
         }
         .footer-content {
           display: flex;
@@ -49,7 +50,7 @@ export default function Footer() {
           font-size: 0.8rem;
           font-weight: 700;
           text-decoration: none;
-          color: white;
+          color: var(--foreground);
           opacity: 0.5;
           transition: 0.3s;
         }

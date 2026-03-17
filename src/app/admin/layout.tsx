@@ -1,18 +1,22 @@
-'use client';
+﻿'use client';
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import AdminGuard from '@/components/AdminGuard';
+import BrandLogo from '@/components/BrandLogo';
+import { useAdminAuth } from '@/context/AdminAuthContext';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { logout } = useAdminAuth();
 
   const navItems = [
-    { label: 'Dashboard', href: '/admin', icon: '📊' },
-    { label: 'Usuarios', href: '/admin/users', icon: '🧑‍🍳' },
-    { label: 'Pedidos y Clientes', href: '/admin/orders', icon: '👥' },
-    { label: 'Configuración de Pagos', href: '/admin/settings', icon: '💳' },
-    { label: 'Volver a la Web', href: '/', icon: '🌐' },
+    { label: "Dashboard", href: "/admin", icon: "DASH" },
+    { label: "Usuarios", href: "/admin/users", icon: "USERS" },
+    { label: "Sorteos", href: "/admin/giveaways", icon: "GIFT" },
+    { label: "Pedidos y clientes", href: "/admin/orders", icon: "ORD" },
+    { label: "Configuracion de pagos", href: "/admin/settings", icon: "PAY" },
+    { label: "Volver a la web", href: "/", icon: "WEB" },
   ];
 
   return (
@@ -20,8 +24,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <div className="admin-layout">
         <aside className="admin-sidebar glass">
           <div className="admin-logo">
-            <span className="neon-text">ADMIN</span>
-            <small>GrandChef Lab</small>
+            <BrandLogo href="/" />
+            <small className="admin-kicker">Panel de Administracion</small>
           </div>
           
           <nav className="admin-nav">
@@ -39,21 +43,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
           <div className="admin-footer">
             <div className="user-info">
-              <span className="avatar">👨‍💻</span>
+              <span className="avatar">ADM</span>
               <div className="user-details">
                 <p className="name">Super Admin</p>
-                <p className="role">Acceso Jesús</p>
+                <p className="role">Acceso propietario</p>
                 <button 
                   onClick={() => {
-                    if(confirm('¿Deseas cerrar la sesión administrativa?')) {
-                      fetch('/api/admin/session/logout', { method: 'POST' }).finally(() => {
-                        window.location.href = '/';
-                      });
+                    if(confirm('Deseas cerrar la sesión administrativa?')) {
+                      logout();
+                      window.location.href = '/';
                     }
                   }} 
                   className="logout-small"
                 >
-                  Cerrar Sesión
+                  Cerrar sesión
                 </button>
               </div>
             </div>
@@ -91,13 +94,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             padding: 0 20px;
           }
 
-          .admin-logo span {
-            display: block;
-            font-size: 1.5rem;
-            font-weight: 900;
-            letter-spacing: 5px;
-            color: var(--primary);
-          }
+          .admin-kicker { display: block; margin-top: 8px; opacity: 0.6; font-weight: 800; letter-spacing: 1px; }
 
           .admin-nav {
             flex-grow: 1;
@@ -181,3 +178,5 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     </AdminGuard>
   );
 }
+
+

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import {
   demoAddReward,
@@ -15,10 +15,11 @@ import {
   demoSetStatus,
   type DemoPlan,
 } from '@/lib/demoUsersStore';
+import { IS_STATIC_EXPORT } from '@/lib/deployTarget';
 
 export default function AdminUserProfilePage() {
-  const params = useParams();
-  const id = String((params as any).id || '');
+  const searchParams = useSearchParams();
+  const id = String(searchParams.get('id') || '');
   const [refresh, setRefresh] = useState(0);
   const [backend, setBackend] = useState<'demo' | 'supabase'>('demo');
   const [serverUser, setServerUser] = useState<any | null>(null);
@@ -33,6 +34,8 @@ export default function AdminUserProfilePage() {
   useEffect(() => {
     let cancelled = false;
     async function load() {
+      if (!id) return;
+      if (IS_STATIC_EXPORT) return;
       try {
         const res = await fetch(`/api/admin/users/${encodeURIComponent(id)}`, { cache: 'no-store' });
         if (res.status === 503) {
@@ -57,6 +60,15 @@ export default function AdminUserProfilePage() {
     return () => { cancelled = true; };
   }, [id, refresh]);
 
+  if (!id) {
+    return (
+      <div className="panel glass">
+        <p>Selecciona un usuario desde el listado.</p>
+        <Link href="/admin/users" className="btn link">Volver</Link>
+      </div>
+    );
+  }
+
   if (!user) {
     return (
       <div className="panel glass">
@@ -72,7 +84,7 @@ export default function AdminUserProfilePage() {
   const overdue = backend === 'demo'
     ? demoOverdueDays(user as any)
     : (user.billing?.nextDueAt ? Math.max(0, Math.floor((Date.now() - new Date(user.billing.nextDueAt).getTime()) / (1000 * 60 * 60 * 24))) : null);
-  const overdueLabel = overdue === null ? '—' : overdue === 0 ? 'Al día' : `${overdue} días tarde`;
+  const overdueLabel = overdue === null ? '-' : overdue === 0 ? 'Al día' : `${overdue} días tarde`;
 
   return (
     <div className="profile">
@@ -95,7 +107,7 @@ export default function AdminUserProfilePage() {
             <span>Pago último</span>
             <span>{user.billing.lastPaidAt ? new Date(user.billing.lastPaidAt).toLocaleString() : 'N/A'}</span>
             <span>Vencimiento</span>
-            <span>{user.billing.nextDueAt ? new Date(user.billing.nextDueAt).toLocaleDateString() : '—'}</span>
+            <span>{user.billing.nextDueAt ? new Date(user.billing.nextDueAt).toLocaleDateString() : '-'}</span>
             <span>Morosidad</span>
             <span className={overdue && overdue > 0 ? 'danger' : ''}>{overdueLabel}</span>
           </div>
@@ -136,7 +148,7 @@ export default function AdminUserProfilePage() {
             <span>Plan base</span>
             <span>{user.plan}</span>
             <span>Override</span>
-            <span>{user.planOverride ? `${user.planOverride.plan} hasta ${new Date(user.planOverride.until).toLocaleDateString()}` : '—'}</span>
+            <span>{user.planOverride ? `${user.planOverride.plan} hasta ${new Date(user.planOverride.until).toLocaleDateString()}` : '-'}</span>
           </div>
 
           <div className="actions">

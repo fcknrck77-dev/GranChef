@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { AccessLevel } from '@/data/access';
 import { useAdminAuth } from './AdminAuthContext';
 
@@ -33,6 +33,7 @@ interface UserAuthContextType {
   isAuthModalOpen: boolean;
   openAuthModal: () => void;
   closeAuthModal: () => void;
+  requireAuth: (next?: () => void) => boolean;
 }
 
 const UserAuthContext = createContext<UserAuthContextType>({
@@ -46,15 +47,14 @@ const UserAuthContext = createContext<UserAuthContextType>({
   isAuthModalOpen: false,
   openAuthModal: () => {},
   closeAuthModal: () => {},
+  requireAuth: () => false,
 });
 
 const VIP_PRO_CODES = ['DABIZXOPRO01', 'DABIZXOPRO02', 'DABIZXO03'];
 const VIP_PRE_CODES = ['ADRIAPRE001', 'ADRIAPRE02'];
 
 export const UserAuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const { isAdmin } = useAdminAuth();
-  const adminUser = process.env.NEXT_PUBLIC_ADMIN_USER || '';
-  const adminPass = process.env.NEXT_PUBLIC_ADMIN_PASS || '';
+  const { isAdmin, login: adminLogin, logout: adminLogout } = useAdminAuth();
   const [authState, setAuthState] = useState<AuthState>({
     isRegistered: false,
     profile: null,
@@ -63,6 +63,7 @@ export const UserAuthProvider = ({ children }: { children: React.ReactNode }) =>
   });
   const [isLoaded, setIsLoaded] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const postAuthActionRef = useRef<null | (() => void)>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem('grandchef_user_auth');
@@ -83,37 +84,61 @@ export const UserAuthProvider = ({ children }: { children: React.ReactNode }) =>
   const openAuthModal = () => setIsAuthModalOpen(true);
   const closeAuthModal = () => setIsAuthModalOpen(false);
 
+  const requireAuth = (next?: () => void) => {
+    if (authState.isRegistered) {
+      next?.();
+      return true;
+    }
+    postAuthActionRef.current = next || null;
+    openAuthModal();
+    return false;
+  };
+
+  const runPostAuthAction = () => {
+    const fn = postAuthActionRef.current;
+    postAuthActionRef.current = null;
+    if (!fn) return;
+    // Let the modal close + state settle before triggering UI transitions.
+    setTimeout(() => fn(), 0);
+  };
+
   const saveState = (newState: AuthState) => {
     setAuthState(newState);
     localStorage.setItem('grandchef_user_auth', JSON.stringify(newState));
   };
 
-  const { login: adminLogin } = useAdminAuth();
-
   const login = async (email: string, pass: string): Promise<boolean> => {
     // Simulación de login. En producción iría a Supabase.
-    // Especial para admin
-    if (adminUser && adminPass && email === adminUser && pass === adminPass) {
-       await adminLogin(email, pass);
-       // Activamos sesión de administrador
-       const adminState: AuthState = {
-         isRegistered: true,
-         profile: { 
-           firstName: 'Chef', 
-           lastName: 'Administrador', 
-           province: 'España', 
-           city: 'GrandChef Lab', 
-           email: adminUser
-         },
-         level: 'ADMIN',
-         registrationDate: new Date().toISOString()
-       };
-       saveState(adminState);
-       return true;
-    }
 
+    // If the credentials match the server-side admin gate, establish the admin session cookie
+    // and mark the local auth state as ADMIN for immediate UX.
+    try {
+      const ok = await adminLogin(email, pass);
+      if (ok) {
+        const adminState: AuthState = {
+          isRegistered: true,
+          profile: {
+            firstName: 'Grand',
+            lastName: 'Chef',
+            province: 'España',
+            city: 'GrandChef Lab',
+            email,
+          },
+          level: 'ADMIN',
+          registrationDate: new Date().toISOString(),
+        };
+        saveState(adminState);
+        closeAuthModal();
+        runPostAuthAction();
+        return true;
+      }
+    } catch {
+      // Ignore and keep local fallback.
+    }
     // Buscamos si existe en el estado local (simulado)
     if (authState.profile?.email === email) {
+      closeAuthModal();
+      runPostAuthAction();
       return true;
     }
     
@@ -149,9 +174,12 @@ export const UserAuthProvider = ({ children }: { children: React.ReactNode }) =>
 
     saveState(newState);
     closeAuthModal();
+    runPostAuthAction();
   };
 
   const logout = () => {
+    // Clear admin session too, if present.
+    adminLogout();
     const newState: AuthState = { 
       isRegistered: false, 
       profile: null, 
@@ -196,7 +224,7 @@ export const UserAuthProvider = ({ children }: { children: React.ReactNode }) =>
   return (
     <UserAuthContext.Provider value={{ 
       authState, registerUser, login, logout, daysRemaining, accountAgeInDays, getEffectiveLevel,
-      isAuthModalOpen, openAuthModal, closeAuthModal
+      isAuthModalOpen, openAuthModal, closeAuthModal, requireAuth
     }}>
       {children}
     </UserAuthContext.Provider>

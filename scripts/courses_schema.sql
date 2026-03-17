@@ -6,11 +6,11 @@ CREATE TABLE IF NOT EXISTS public.courses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     title TEXT NOT NULL,
     description TEXT,
-    instructor TEXT DEFAULT 'GrandChef AI',
+    instructor TEXT DEFAULT 'Grand Chef',
     category TEXT DEFAULT 'Técnicas', -- 'Técnicas', 'Ingredientes', 'Gestión', 'Creatividad'
     tier TEXT NOT NULL CHECK (tier IN ('FREE', 'PRO', 'PREMIUM')), 
     days_required INTEGER NOT NULL DEFAULT 1, -- Día de desbloqueo (1, 2, 3...)
-    reading_time TEXT DEFAULT '15 min',
+    reading_time TEXT DEFAULT '',
     modules JSONB NOT NULL DEFAULT '[]'::jsonb, -- Estructura: [{id: 1, title: '...', content: '...'}]
     created_at TIMESTAMPTZ DEFAULT now()
 );

@@ -100,7 +100,7 @@ export default function PoliciesPage() {
 
               <section>
                 <h3>1.3 Propiedad Intelectual e Industrial</h3>
-                <p>Todo el código fuente, diseño, interfaces, logotipos, textos, algoritmos de maridaje, descripciones técnicas, vídeos, MasterClasses sintetizadas por IA y el resto del contenido de la plataforma son propiedad exclusiva de Jesus Fernandez o de sus licenciantes, estando protegidos por las leyes de propiedad intelectual e industrial.</p>
+                <p>Todo el código fuente, diseño, interfaces, logotipos, textos, algoritmos de maridaje, descripciones técnicas, vídeos, MasterClasses sintetizadas y el resto del contenido de la plataforma son propiedad exclusiva de Jesus Fernandez o de sus licenciantes, estando protegidos por las leyes de propiedad intelectual e industrial.</p>
                 <p>Queda terminantemente prohibida la reproducción, distribución, comunicación pública, transformación o extracción masiva de datos (scraping) total o parcial, sin la autorización expresa y por escrito del titular.</p>
               </section>
 
@@ -355,4 +355,3 @@ export default function PoliciesPage() {
     </div>
   );
 }
-

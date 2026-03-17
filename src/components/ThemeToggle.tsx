@@ -36,7 +36,7 @@ export default function ThemeToggle() {
         transition: 'var(--transition)'
       }}
     >
-      {theme === 'light' ? '🌙 Dark Mode' : '☀️ Light Mode'}
+      {theme === 'light' ? 'Modo oscuro' : 'Modo claro'}
     </button>
   );
 }

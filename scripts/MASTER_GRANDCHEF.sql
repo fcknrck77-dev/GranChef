@@ -13,11 +13,11 @@ CREATE TABLE public.courses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     title TEXT NOT NULL,
     description TEXT,
-    instructor TEXT DEFAULT 'GrandChef AI',
+    instructor TEXT DEFAULT 'Grand Chef',
     category TEXT DEFAULT 'Técnicas',
     tier TEXT NOT NULL CHECK (tier IN ('FREE', 'PRO', 'PREMIUM')), 
     days_required INTEGER NOT NULL DEFAULT 1,
-    reading_time TEXT DEFAULT '15 min',
+    reading_time TEXT DEFAULT '',
     modules JSONB NOT NULL DEFAULT '[]'::jsonb,
     created_at TIMESTAMPTZ DEFAULT now()
 );
@@ -83,3 +83,26 @@ VALUES
 -- 6. ÍNDICES DE RENDIMIENTO
 CREATE INDEX idx_courses_tier ON public.courses(tier);
 CREATE INDEX idx_courses_days ON public.courses(days_required);
+
+-- 7. RECIPES (contenido editable post-build)
+DROP TABLE IF EXISTS public.recipes CASCADE;
+CREATE TABLE IF NOT EXISTS public.recipes (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT 'Grand Chef',
+    tier TEXT NOT NULL CHECK (tier IN ('FREE', 'PRO', 'PREMIUM')),
+    difficulty TEXT NOT NULL DEFAULT 'Basico' CHECK (difficulty IN ('Basico', 'Intermedio', 'Avanzado', 'Maestro')),
+    servings INTEGER NOT NULL DEFAULT 2,
+    times JSONB NOT NULL DEFAULT '{"prepMin":10,"cookMin":10}'::jsonb,
+    description TEXT NOT NULL DEFAULT '',
+    utensils JSONB NOT NULL DEFAULT '[]'::jsonb,
+    ingredients JSONB NOT NULL DEFAULT '[]'::jsonb,
+    steps JSONB NOT NULL DEFAULT '[]'::jsonb,
+    techniques JSONB NOT NULL DEFAULT '[]'::jsonb,
+    tags JSONB NOT NULL DEFAULT '[]'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.recipes ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public read recipes" ON public.recipes;
+CREATE POLICY "Public read recipes" ON public.recipes FOR SELECT USING (true);

@@ -1,4 +1,4 @@
-export type AccessLevel = 'FREE' | 'PRO' | 'PREMIUM' | 'ADMIN';
+﻿export type AccessLevel = 'FREE' | 'PRO' | 'PREMIUM' | 'ADMIN';
 
 export interface UserAccess {
   level: AccessLevel;
@@ -39,7 +39,7 @@ export const ACCESS_CONFIGS: Record<AccessLevel, UserAccess> = {
     level: 'PREMIUM',
     price: '49€',
     features: {
-      ingredientsLimit: 50,
+      ingredientsLimit: 100,
       techniquesLimit: 30,
       recipesLimit: 100,
       scientificDataEnabled: true,
@@ -50,7 +50,7 @@ ADMIN: {
     level: 'ADMIN',
     price: 'N/A',
     features: {
-      ingredientsLimit: 50,
+      ingredientsLimit: 100,
       techniquesLimit: 30,
       recipesLimit: 100,
       scientificDataEnabled: true,
@@ -58,3 +58,4 @@ ADMIN: {
     }
   }
 };
+

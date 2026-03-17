@@ -4,7 +4,6 @@ import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import { AdminAuthProvider } from "@/context/AdminAuthContext";
 import { UserAuthProvider } from "@/context/UserAuthContext";
-import StyledJsxRegistry from "@/lib/registry";
 import Footer from "@/components/Footer";
 import SecurityLayer from "@/components/SecurityLayer";
 import GlobalAuthGuard from "@/components/GlobalAuthGuard";
@@ -23,18 +22,16 @@ export default function RootLayout({
     <html lang="es">
       <body style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
         <SecurityLayer />
-        <StyledJsxRegistry>
-          <AdminAuthProvider>
-            <UserAuthProvider>
-              <GlobalAuthGuard />
-              <Navbar />
-              <main style={{ flex: 1 }}>
-                {children}
-              </main>
-              <Footer />
-            </UserAuthProvider>
-          </AdminAuthProvider>
-        </StyledJsxRegistry>
+        <AdminAuthProvider>
+          <UserAuthProvider>
+            <GlobalAuthGuard />
+            <Navbar />
+            <main style={{ flex: 1 }}>
+              {children}
+            </main>
+            <Footer />
+          </UserAuthProvider>
+        </AdminAuthProvider>
       </body>
     </html>
   );

@@ -1,5 +1,7 @@
 'use client';
 
+import { BookOpen, Flame, FlaskConical } from 'lucide-react';
+
 export default function Profile() {
   const stats = [
     { label: 'Experimentos', value: '42' },
@@ -62,9 +64,9 @@ export default function Profile() {
           <section className="dashboard-section">
              <h3 className="section-title">Badges de Honor</h3>
              <div className="badges-grid">
-               <div className="badge-item glass">🧪 Alquimista Novato</div>
-               <div className="badge-index glass">📖 Devorador de Libros</div>
-               <div className="badge-item glass">🔥 Maestro de la Llama</div>
+               <div className="badge-item glass"><FlaskConical size={18} aria-hidden="true" /> Alquimista Novato</div>
+               <div className="badge-item glass"><BookOpen size={18} aria-hidden="true" /> Devorador de Libros</div>
+               <div className="badge-item glass"><Flame size={18} aria-hidden="true" /> Maestro de la Llama</div>
              </div>
           </section>
         </main>
@@ -226,7 +228,10 @@ export default function Profile() {
           display: flex;
           gap: 15px;
         }
-        .badge-item, .badge-index {
+        .badge-item {
+          display: flex;
+          align-items: center;
+          gap: 10px;
           padding: 15px 25px;
           border-radius: 12px;
           border: 1px solid var(--border);

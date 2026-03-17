@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { INITIAL_SETTINGS } from '@/data/adminSettings';
+import { Phone, AtSign, CreditCard } from 'lucide-react';
 
 export default function PaymentSettings() {
   const [settings, setSettings] = useState(INITIAL_SETTINGS);
@@ -19,61 +20,52 @@ export default function PaymentSettings() {
     <div className="payment-settings">
       <header className="page-header">
         <h1 className="neon-text">Configuración de Pagos</h1>
-        <p>Define los datos de destino para Bizum y Transferencias Bancarias.</p>
+        <p>Datos que verá el cliente al pagar con tarjeta y en sus recibos de Stripe.</p>
       </header>
 
       <div className="settings-grid">
         <div className="settings-card glass">
           <div className="card-header">
-            <span className="icon">📱</span>
-            <h3>Configuración BIZUM</h3>
+            <span className="icon" aria-hidden="true"><AtSign size={20} /></span>
+            <h3>Contacto de soporte</h3>
           </div>
           <div className="form-group">
-            <label>NÚMERO DE TELÉFONO DESTINO</label>
+            <label>EMAIL DE SOPORTE</label>
             <input 
               type="text" 
               className="glass-input" 
-              value={settings.bizumPhone}
-              onChange={(e) => setSettings({...settings, bizumPhone: e.target.value})}
+              value={settings.supportEmail}
+              onChange={(e) => setSettings({...settings, supportEmail: e.target.value})}
             />
-            <small>Este número se enviará de forma privada al cliente tras su solicitud.</small>
+            <small>Se usa en los recibos y comunicaciones automáticas.</small>
+          </div>
+          <div className="form-group">
+            <label>TELÉFONO DE SOPORTE</label>
+            <input 
+              type="text" 
+              className="glass-input" 
+              value={settings.supportPhone}
+              onChange={(e) => setSettings({...settings, supportPhone: e.target.value})}
+            />
+            <small>Visible para usuarios autenticados.</small>
           </div>
         </div>
 
         <div className="settings-card glass">
           <div className="card-header">
-            <span className="icon">🏛️</span>
-            <h3>Configuración BANCARIA</h3>
+            <span className="icon" aria-hidden="true"><CreditCard size={20} /></span>
+            <h3>Tarjeta (Stripe)</h3>
           </div>
           
           <div className="form-group">
-            <label>TITULAR DE LA CUENTA</label>
+            <label>DESCRIPTOR DE FACTURACIÓN</label>
             <input 
               type="text" 
               className="glass-input" 
-              value={settings.accountHolder}
-              onChange={(e) => setSettings({...settings, accountHolder: e.target.value})}
+              value={settings.billingDescriptor}
+              onChange={(e) => setSettings({...settings, billingDescriptor: e.target.value})}
             />
-          </div>
-
-          <div className="form-group">
-            <label>IBAN DESTINO</label>
-            <input 
-              type="text" 
-              className="glass-input" 
-              value={settings.iban}
-              onChange={(e) => setSettings({...settings, iban: e.target.value})}
-            />
-          </div>
-
-          <div className="form-group">
-            <label>NOMBRE DEL BANCO</label>
-            <input 
-              type="text" 
-              className="glass-input" 
-              value={settings.bankName}
-              onChange={(e) => setSettings({...settings, bankName: e.target.value})}
-            />
+            <small>Texto que aparece en el extracto: ej. APPGRANDCHEF.</small>
           </div>
         </div>
       </div>

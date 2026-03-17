@@ -16,9 +16,13 @@
 # next.js
 /.next/
 /out/
+/out-landing/
+.landing_stash/
+src/_landing_stash/
 
 # production
 /build
+/dist/
 
 # misc
 .DS_Store
@@ -52,3 +56,12 @@ culinary_data_rich.txt
 molecular_data.txt
 extracted_data.txt
 ingredients_generated.ts
+
+# Capacitor / Android
+/android/
+/android/.gradle/
+/android/.idea/
+/android/build/
+/android/app/build/
+/android/local.properties
+/apk/

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { IS_STATIC_EXPORT } from '@/lib/deployTarget';
 
 interface AdminAuthContextType {
   isAdmin: boolean;
@@ -16,9 +17,13 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     (async () => {
       try {
+        if (IS_STATIC_EXPORT) {
+          setIsAdmin(localStorage.getItem('gc_is_admin') === '1');
+          return;
+        }
         const res = await fetch('/api/admin/session/me', { cache: 'no-store' });
-        const data = await res.json();
-        setIsAdmin(Boolean(data?.isAdmin));
+        const data = await res.json().catch(() => ({}));
+        setIsAdmin(Boolean((data as any)?.isAdmin));
       } catch {
         setIsAdmin(false);
       }
@@ -27,6 +32,15 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (username: string, password: string) => {
     try {
+      if (IS_STATIC_EXPORT) {
+        const expectedUser = process.env.NEXT_PUBLIC_ADMIN_USER || '';
+        const expectedPass = process.env.NEXT_PUBLIC_ADMIN_PASS || '';
+        const allow = Boolean(expectedUser && expectedPass) && username === expectedUser && password === expectedPass;
+        if (!allow) return false;
+        localStorage.setItem('gc_is_admin', '1');
+        setIsAdmin(true);
+        return true;
+      }
       const res = await fetch('/api/admin/session/login', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -42,6 +56,10 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     setIsAdmin(false);
+    if (IS_STATIC_EXPORT) {
+      localStorage.removeItem('gc_is_admin');
+      return;
+    }
     fetch('/api/admin/session/logout', { method: 'POST' }).catch(() => {});
   };
 

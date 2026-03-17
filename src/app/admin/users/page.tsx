@@ -151,7 +151,7 @@ export default function AdminUsersPage() {
             const overdue = backend === 'demo'
               ? demoOverdueDays(u as any)
               : (u.billing?.nextDueAt ? Math.max(0, Math.floor((Date.now() - new Date(u.billing.nextDueAt).getTime()) / (1000 * 60 * 60 * 24))) : null);
-            const overdueLabel = overdue === null ? '—' : overdue === 0 ? '0 días' : `${overdue} días`;
+            const overdueLabel = overdue === null ? '-' : overdue === 0 ? '0 días' : `${overdue} días`;
             const paymentLabel = u.billing?.lastPaidAt ? new Date(u.billing.lastPaidAt).toLocaleDateString() : 'N/A';
             const isOverdue = overdue !== null && overdue > 0;
 
@@ -176,7 +176,7 @@ export default function AdminUsersPage() {
                 <div>{paymentLabel}</div>
                 <div className={isOverdue ? 'danger' : ''}>{overdueLabel}</div>
                 <div className="actions">
-                  <Link className="btn link" href={`/admin/users/${u.id}`}>Perfil</Link>
+                  <Link className="btn link" href={`/admin/users/user?id=${encodeURIComponent(u.id)}`}>Perfil</Link>
                   <button className="btn subtle" onClick={() => {
                     if (backend === 'demo') {
                       demoMarkPaid(u.id);
@@ -306,10 +306,10 @@ export default function AdminUsersPage() {
               <span>{(g as any).prizeLabel ?? (g as any).prize_label}</span>
               <span>
                 {Array.isArray((g as any).winners)
-                  ? (g as any).winners.map((w: any) => w.name).join(', ') || '—'
+                  ? (g as any).winners.map((w: any) => w.name).join(', ') || '-'
                   : (typeof (g as any).winner_count === 'number'
                       ? `${(g as any).winner_count} ganador(es)`
-                      : '—')}
+                      : '-')}
               </span>
             </div>
           ))}

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { appHref } from '@/lib/appHref';
 
 export default function Pricing() {
   const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly');
@@ -13,9 +14,9 @@ export default function Pricing() {
       priceAnnual: 0,
       originalAnnual: 0,
       discount: 0,
-      features: ['5 Ingredientes Desbloqueados', '2 Técnicas Básicas', 'Acceso al Laboratorio (Limitado)', 'Modo Lectura'], 
+      features: ['5 Ingredientes desbloqueados', '2 Técnicas básicas', 'Acceso al laboratorio (limitado)', 'Modo lectura'], 
       btn: 'Empezar ya',
-      href: '/laboratory'
+      href: appHref('/laboratory')
     },
     { 
       name: 'PRO', 
@@ -23,10 +24,10 @@ export default function Pricing() {
       priceAnnual: 193,
       originalAnnual: 228,
       discount: 15,
-      features: ['Más de 500 Ingredientes Maestros', '10 Técnicas de Vanguardia', 'Recetario Completo', 'Análisis Molecular', 'Soporte prioritario'], 
+      features: ['Más de 500 ingredientes maestros', '10 técnicas de vanguardia', 'Recetario completo', 'Análisis molecular', 'Soporte prioritario'], 
       btn: 'Subir a PRO', 
       featured: true,
-      href: `/checkout?tier=PRO&billing=${billing}`
+      href: appHref(`/checkout?tier=PRO&billing=${billing}`)
     },
     { 
       name: 'PREMIUM', 
@@ -34,9 +35,9 @@ export default function Pricing() {
       priceAnnual: 470,
       originalAnnual: 588,
       discount: 20,
-      features: ['Todo Ilimitado', 'Todas las Técnicas del Mundo', 'Bridges con IA Culinaria', 'Nuevos Ingredientes Mensuales', 'Acceso a Masterclasses', 'Exportación a PDF e Impresión'], 
+      features: ['Todo ilimitado', 'Todas las técnicas', 'Bridges culinarios', 'Nuevos ingredientes mensuales', 'Acceso a masterclasses', 'Exportación a PDF e impresión'], 
       btn: 'Ser Premium', 
-      href: `/checkout?tier=PREMIUM&billing=${billing}`
+      href: appHref(`/checkout?tier=PREMIUM&billing=${billing}`)
     },
   ];
 
@@ -93,7 +94,7 @@ export default function Pricing() {
                 ))}
               </ul>
 
-              <Link href={plan.name === 'FREE' ? plan.href : `/checkout?tier=${plan.name}&billing=${billing}`} className="plan-btn-link">
+              <Link href={plan.href} className="plan-btn-link">
                 <button className={`plan-btn ${plan.featured ? 'primary-btn' : 'secondary-btn'}`}>
                   {plan.btn}
                 </button>
@@ -104,7 +105,7 @@ export default function Pricing() {
       </div>
 
       <footer className="pricing-footer">
-        <p>Pagos seguros garantizados mediante Bizum, Transferencia Bancaria y Tarjeta (3D Secure).</p>
+        <p>Pagos seguros con tarjeta (3D Secure) procesados por Stripe.</p>
       </footer>
 
       <style jsx>{`
@@ -138,124 +139,44 @@ export default function Pricing() {
           padding: 3px 8px;
           border-radius: 10px;
           font-weight: 900;
-          white-space: nowrap;
-          box-shadow: var(--neon-shadow);
         }
 
-        .switch {
-          position: relative;
-          display: inline-block;
-          width: 50px;
-          height: 26px;
-        }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .slider {
-          position: absolute;
-          cursor: pointer;
-          top: 0; left: 0; right: 0; bottom: 0;
-          background-color: rgba(128,128,128,0.3);
-          transition: .4s;
-          border-radius: 34px;
-        }
-        .slider:before {
-          position: absolute;
-          content: "";
-          height: 18px;
-          width: 18px;
-          left: 4px;
-          bottom: 4px;
-          background-color: white;
-          transition: .4s;
-          border-radius: 50%;
-        }
-        input:checked + .slider { background-color: var(--primary); }
-        input:checked + .slider:before { transform: translateX(24px); background-color: black; }
+        .pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 30px; }
+        .pricing-card { padding: 40px; border-radius: 28px; border: 1px solid var(--border); position: relative; overflow: hidden; transition: 0.3s; }
+        .pricing-card:hover { transform: translateY(-8px); border-color: var(--primary); box-shadow: var(--neon-shadow); }
+        .pricing-card.featured { border-color: var(--primary); box-shadow: var(--neon-shadow); }
+        .featured-tag { position: absolute; top: 20px; right: 20px; background: var(--primary); color: black; padding: 6px 10px; border-radius: 10px; font-weight: 900; font-size: 0.7rem; }
+        .pricing-card h3 { font-size: 1.5rem; letter-spacing: 2px; margin-bottom: 20px; }
 
-        .pricing-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-          gap: 30px;
-          max-width: 1200px;
-          margin: 0 auto;
-        }
+        .price-display { margin-bottom: 20px; }
+        .amount { font-size: 3rem; font-weight: 900; }
+        .period { opacity: 0.5; font-size: 1rem; margin-left: 6px; }
+        .annual-pricing-info { display: flex; flex-direction: column; gap: 6px; }
+        .original-price { text-decoration: line-through; opacity: 0.4; }
+        .highlight { color: var(--primary); }
+        .discount-callout { font-weight: 800; color: var(--primary); }
+        .price-sub { opacity: 0.6; font-size: 0.9rem; }
 
-        .pricing-card {
-          padding: 60px 40px;
-          border-radius: 40px;
-          border: 1px solid var(--border);
-          display: flex;
-          flex-direction: column;
-          position: relative;
-          transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .pricing-card:hover {
-          transform: translateY(-15px);
-          border-color: var(--primary);
-          box-shadow: 0 20px 40px rgba(0,0,0,0.4);
-        }
-
-        .featured {
-          border-color: var(--primary);
-          background: rgba(var(--primary-rgb), 0.03);
-          transform: scale(1.05);
-        }
-
-        .featured-tag {
-          position: absolute;
-          top: -15px;
-          left: 50%;
-          transform: translateX(-50%);
-          background: var(--primary);
-          color: white;
-          padding: 6px 20px;
-          border-radius: 20px;
-          font-size: 0.7rem;
-          font-weight: 800;
-          letter-spacing: 2px;
-          box-shadow: var(--neon-shadow);
-        }
-
-        h3 { font-size: 1.8rem; margin-bottom: 10px; opacity: 0.8; letter-spacing: 3px; }
-        
-        .price-display { margin-bottom: 30px; min-height: 120px; display: flex; flex-direction: column; justify-content: flex-end; }
-        .amount { font-size: 4rem; font-weight: 900; color: var(--primary); line-height: 1; }
-        .period { opacity: 0.4; font-size: 1rem; margin-left: 10px; }
-        
-        .annual-pricing-info { display: flex; flex-direction: column; gap: 5px; }
-        .discount-callout { color: var(--primary); font-weight: 900; font-size: 1.2rem; margin-bottom: 5px; }
-        .original-price { text-decoration: line-through; opacity: 0.4; font-size: 1.5rem; font-weight: bold; }
-        .price-sub { font-size: 1rem; opacity: 0.8; font-weight: 600; margin-top: 5px; }
-
-        .feature-list { list-style: none; margin-bottom: 50px; flex-grow: 1; }
-        .feature-list li { margin-bottom: 15px; font-size: 1.05rem; opacity: 0.7; display: flex; align-items: center; gap: 15px; }
-        .check { color: var(--primary); font-size: 1.2rem; }
+        .feature-list { list-style: none; padding: 0; margin: 0 0 25px 0; display: flex; flex-direction: column; gap: 10px; }
+        .feature-list li { display: flex; align-items: center; gap: 10px; font-size: 0.95rem; opacity: 0.85; }
+        .check { color: var(--primary); font-weight: 900; }
 
         .plan-btn-link { text-decoration: none; }
-        .plan-btn {
-          width: 100%;
-          padding: 20px;
-          border-radius: 50px;
-          font-weight: 800;
-          cursor: pointer;
-          transition: var(--transition);
-          font-size: 1rem;
-          letter-spacing: 1px;
-          text-transform: uppercase;
-        }
+        .plan-btn { width: 100%; padding: 14px; border-radius: 12px; border: none; cursor: pointer; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; }
+        .primary-btn { background: var(--primary); color: black; box-shadow: var(--neon-shadow); }
+        .secondary-btn { background: rgba(255,255,255,0.05); color: white; border: 1px solid var(--border); }
 
-        .primary-btn { background: var(--primary); border: none; color: white; box-shadow: var(--neon-shadow); }
-        .secondary-btn { background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: white; }
+        .pricing-footer { text-align: center; margin-top: 60px; opacity: 0.6; font-size: 0.95rem; }
 
-        .plan-btn:hover { transform: scale(1.02); opacity: 0.9; }
-
-        .pricing-footer { margin-top: 80px; text-align: center; opacity: 0.4; font-size: 0.9rem; }
-
-        @media (max-width: 768px) {
-          .pricing-header h1 { font-size: 2.5rem; }
-          .featured { transform: scale(1); }
-          .pricing-grid { grid-template-columns: 1fr; }
-        }
+        /* Switch */
+        .switch { position: relative; display: inline-block; width: 52px; height: 28px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255,255,255,0.1); transition: 0.4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 4px; bottom: 4px; background-color: white; transition: 0.4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--primary); }
+        input:checked + .slider:before { transform: translateX(24px); }
+        .slider.round { border-radius: 34px; }
+        .slider.round:before { border-radius: 50%; }
       `}</style>
     </div>
   );

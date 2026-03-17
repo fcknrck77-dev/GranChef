@@ -153,7 +153,7 @@ export default function AuthModal() {
         .auth-overlay {
           position: fixed;
           inset: 0;
-          background: rgba(0,0,0,0.9);
+          background: var(--overlay-backdrop);
           backdrop-filter: blur(15px);
           z-index: 10000;
           display: flex;
@@ -164,7 +164,8 @@ export default function AuthModal() {
         .auth-card {
           width: 100%;
           max-width: 480px;
-          background: rgba(20,20,20,0.8);
+          background: var(--modal-surface);
+          color: var(--modal-text);
           padding: 40px;
           border-radius: 25px;
           position: relative;
@@ -180,7 +181,7 @@ export default function AuthModal() {
           right: 20px;
           background: none;
           border: none;
-          color: white;
+          color: var(--modal-text);
           opacity: 0.5;
           cursor: pointer;
         }
@@ -188,17 +189,18 @@ export default function AuthModal() {
 
         .auth-tabs {
           display: flex;
-          background: rgba(255,255,255,0.05);
+          background: var(--modal-surface-2);
           border-radius: 12px;
           padding: 5px;
           margin-bottom: 30px;
+          border: 1px solid var(--modal-border);
         }
         .tab-btn {
           flex: 1;
           padding: 10px;
           border: none;
           background: none;
-          color: white;
+          color: var(--modal-text);
           font-weight: 700;
           font-size: 0.8rem;
           cursor: pointer;
@@ -214,7 +216,7 @@ export default function AuthModal() {
 
         .auth-header { text-align: center; margin-bottom: 30px; }
         .auth-header h2 { font-size: 2rem; color: var(--primary); margin-bottom: 8px; letter-spacing: -1px; }
-        .auth-header p { font-size: 0.9rem; opacity: 0.5; }
+        .auth-header p { font-size: 0.9rem; opacity: 0.8; color: var(--modal-muted); }
 
         .error-msg { background: rgba(255,0,0,0.1); border: 1px solid #ff4444; color: #ff4444; padding: 12px; border-radius: 8px; font-size: 0.8rem; margin-bottom: 20px; text-align: center; }
 
@@ -235,16 +237,16 @@ export default function AuthModal() {
         input {
           width: 100%;
           padding: 14px 14px 14px 45px;
-          background: rgba(255,255,255,0.03);
-          border: 1px solid rgba(255,255,255,0.1);
+          background: var(--modal-surface-2);
+          border: 1px solid var(--modal-border);
           border-radius: 12px;
-          color: white;
+          color: var(--modal-text);
           font-family: inherit;
           outline: none;
           transition: 0.3s;
         }
         input:focus {
-          background: rgba(255,255,255,0.06);
+          background: var(--modal-surface-2);
           border-color: var(--primary);
           box-shadow: 0 0 15px var(--primary-glow);
         }

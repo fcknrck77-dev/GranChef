@@ -1,33 +1,94 @@
-'use client';
+﻿'use client';
 
-import { useState } from 'react';
-import { ingredients, Ingredient } from '@/data/ingredients';
-import { techniques, Technique } from '@/data/techniques';
-import { ACCESS_CONFIGS, AccessLevel } from '@/data/access';
-import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { ingredients as localIngredients, Ingredient } from '@/data/ingredients';
+import { techniques as localTechniques, Technique } from '@/data/techniques';
+import { recipes } from '@/data/recipes';
+import { ACCESS_CONFIGS } from '@/data/access';
 import DetailModal from '@/components/DetailModal';
 import LockedOverlay from '@/components/LockedOverlay';
 import { useUserAuth } from '@/context/UserAuthContext';
 import { useAdminAuth } from '@/context/AdminAuthContext';
+import { getSupabase } from '@/lib/supabaseClient';
 
 export default function Laboratory() {
-  const { getEffectiveLevel, authState, openAuthModal } = useUserAuth();
+  const { getEffectiveLevel, requireAuth } = useUserAuth();
   const [slotA, setSlotA] = useState<Ingredient | null>(null);
   const [slotB, setSlotB] = useState<Ingredient | null>(null);
   const [slotTech, setSlotTech] = useState<Technique | null>(null);
   const [isMixing, setIsMixing] = useState(false);
   const [result, setResult] = useState<{ title: string; text: string; type: 'success' | 'experiment' | 'discovery' | 'fiasco' } | null>(null);
   const [selectedItem, setSelectedItem] = useState<Ingredient | Technique | null>(null);
+  const [ingredientsData, setIngredientsData] = useState<Ingredient[]>(localIngredients);
+  const [techniquesData, setTechniquesData] = useState<Technique[]>(localTechniques);
   
   const userLevel = getEffectiveLevel();
   const { isAdmin } = useAdminAuth();
   const config = ACCESS_CONFIGS[isAdmin ? 'PREMIUM' : userLevel];
   const ingLimit = isAdmin ? 999 : config.features.ingredientsLimit;
   const techLimit = isAdmin ? 999 : config.features.techniquesLimit;
+  const canAccessRecipe = (tier: 'FREE' | 'PRO' | 'PREMIUM') =>
+    isAdmin ||
+    tier === 'FREE' ||
+    (tier === 'PRO' && (userLevel === 'PRO' || userLevel === 'PREMIUM')) ||
+    (tier === 'PREMIUM' && userLevel === 'PREMIUM');
 
   // Show ALL items but mark which are locked
-  const availableIngredients = ingredients;
-  const availableTechniques = techniques;
+  const availableIngredients = ingredientsData;
+  const availableTechniques = techniquesData;
+
+  useEffect(() => {
+    const supabase = getSupabase();
+    if (!supabase) return;
+
+    (async () => {
+      try {
+        const [ingRes, techRes] = await Promise.all([
+          supabase
+            .from('ingredients')
+            .select('*')
+            .order('family', { ascending: true })
+            .order('name', { ascending: true })
+            .limit(200),
+          supabase
+            .from('techniques')
+            .select('*')
+            .order('category', { ascending: true })
+            .order('name', { ascending: true })
+            .limit(200)
+        ]);
+
+        if (!ingRes.error && ingRes.data && ingRes.data.length > 0) {
+          const mapped = ingRes.data.map((r: any) => ({
+            id: String(r.id),
+            name: String(r.name),
+            category: String(r.category),
+            family: String(r.family),
+            description: String(r.description),
+            pairingNotes: Array.isArray(r.pairing_notes) ? r.pairing_notes.map(String) : [],
+            stories: r.stories && typeof r.stories === 'object' ? r.stories : undefined
+          }));
+          setIngredientsData(mapped);
+        }
+
+        if (!techRes.error && techRes.data && techRes.data.length > 0) {
+          const mapped = techRes.data.map((r: any) => ({
+            id: String(r.id),
+            name: String(r.name),
+            category: String(r.category) as any,
+            description: String(r.description),
+            difficulty: String(r.difficulty) as any,
+            equipment: Array.isArray(r.equipment) ? r.equipment.map(String) : [],
+            reagents: Array.isArray(r.reagents) ? r.reagents.map(String) : [],
+            pairingNotes: Array.isArray(r.pairing_notes) ? r.pairing_notes.map(String) : []
+          }));
+          setTechniquesData(mapped);
+        }
+      } catch {
+        // Keep local fallback
+      }
+    })();
+  }, []);
 
   const handleMix = () => {
     if (!slotA || !slotB) return;
@@ -51,7 +112,7 @@ export default function Laboratory() {
 
       if (slotTech && !techBonus && Math.random() > 0.7) {
         setResult({
-          title: "¡Inestabilidad Molecular!",
+          title: "¡Inestabilidad molecular!",
           text: `La técnica de ${slotTech.name} ha colapsado. La estructura de ${slotA.name} no ha soportado el proceso químico. Resultado inestable.`,
           type: 'fiasco'
         });
@@ -60,7 +121,7 @@ export default function Laboratory() {
 
       if (story) {
         setResult({
-          title: techBonus ? "¡Obra Maestra Vanguardista!" : "¡Sinergia Descubierta!",
+          title: techBonus ? "¡Obra maestra vanguardista!" : "¡Sinergia descubierta!",
           text: techBonus 
             ? `Elevando la combinación: ${story}. Los equipos de ${slotTech?.equipment.join(' y ')} han optimizado la textura.`
             : story,
@@ -76,12 +137,23 @@ export default function Laboratory() {
         });
       } else {
         setResult({
-          title: "Anomalía de Sabor",
+          title: "Anomalía de sabor",
           text: `${slotA.name} y ${slotB.name} presentan perfiles discordantes. Requieres un agente de puente molecular.`,
           type: 'experiment'
         });
       }
     }, 2000);
+  };
+
+  const matchingRecipes = () => {
+    if (!slotA && !slotB && !slotTech) return [];
+    const selectedNames = [slotA?.name, slotB?.name].filter(Boolean).map((v) => v!.toLowerCase());
+    const selectedTech = slotTech?.id;
+    return recipes.filter((r) => {
+      const hasIng = selectedNames.some((n) => r.ingredients.some((ing) => ing.name.toLowerCase().includes(n)));
+      const hasTech = selectedTech ? r.techniques.includes(selectedTech) : false;
+      return hasIng || hasTech;
+    }).slice(0, 6);
   };
 
   return (
@@ -99,7 +171,7 @@ export default function Laboratory() {
                 <div className="node active animate-pop">
                   <span className="node-family">{slotA.family}</span>
                   <span className="node-name">{slotA.name}</span>
-                  <button className="info-icon-btn" onClick={(e) => { e.stopPropagation(); setSelectedItem(slotA); }}>ℹ️</button>
+                  <button className="info-icon-btn" onClick={(e) => { e.stopPropagation(); requireAuth(() => setSelectedItem(slotA)); }}>i</button>
                 </div>
               ) : (
                 <div className="placeholder">Ingrediente A</div>
@@ -112,7 +184,7 @@ export default function Laboratory() {
                   <div className="tech-node active animate-pop">
                     <span className="tech-cat">{slotTech.category}</span>
                     <div className="tech-name">{slotTech.name}</div>
-                    <button className="info-icon-btn small" onClick={(e) => { e.stopPropagation(); setSelectedItem(slotTech); }}>ℹ️</button>
+                    <button className="info-icon-btn small" onClick={(e) => { e.stopPropagation(); requireAuth(() => setSelectedItem(slotTech)); }}>i</button>
                   </div>
                 ) : (
                   <div className="placeholder-tech">¿Técnica?</div>
@@ -125,7 +197,7 @@ export default function Laboratory() {
                   onClick={handleMix}
                   disabled={!slotA || !slotB || isMixing}
                 >
-                  {isMixing ? '⚛️' : 'MIX'}
+                  {isMixing ? '...' : 'MIX'}
                 </button>
               </div>
             </div>
@@ -135,7 +207,7 @@ export default function Laboratory() {
                 <div className="node active animate-pop">
                   <span className="node-family">{slotB.family}</span>
                   <span className="node-name">{slotB.name}</span>
-                  <button className="info-icon-btn" onClick={(e) => { e.stopPropagation(); setSelectedItem(slotB); }}>ℹ️</button>
+                  <button className="info-icon-btn" onClick={(e) => { e.stopPropagation(); requireAuth(() => setSelectedItem(slotB)); }}>i</button>
                 </div>
               ) : (
                 <div className="placeholder">Ingrediente B</div>
@@ -188,31 +260,61 @@ export default function Laboratory() {
           </div>
         )}
 
+        {(slotA || slotB || slotTech) && (
+          <div className="recipe-suggestions glass">
+            <div className="suggest-header">
+              <h3>Recetas relacionadas</h3>
+              <p>Filtradas por ingredientes y técnicas seleccionadas.</p>
+            </div>
+            <div className="recipe-list">
+              {matchingRecipes().length === 0 && <p className="empty-recipes">Sin coincidencias por ahora.</p>}
+              {matchingRecipes().map((rec) => {
+                const locked = !canAccessRecipe(rec.tier);
+                return (
+                  <div key={rec.id} className={`recipe-chip ${locked ? 'locked' : ''}`}>
+                    <div>
+                      <div className="chip-title">{rec.title}</div>
+                      <div className="chip-meta">Plan {rec.tier} · {rec.times.prepMin + rec.times.cookMin} min</div>
+                    </div>
+                    {locked ? (
+                      <button className="unlock-btn" onClick={() => requireAuth(() => { window.location.href = '/pricing'; })}>Desbloquear</button>
+                    ) : (
+                      <button className="unlock-btn" onClick={() => requireAuth(() => { window.location.href = '/recipes'; })}>Ver receta</button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="inventory-tabs">
           <div className="tab-section">
             <h3 className="tab-title">
-              INGREDIENTES ({ingLimit}/{ingredients.length}) — NIVEL {userLevel}
+              INGREDIENTES ({ingLimit}/{ingredientsData.length}) - NIVEL {userLevel}
             </h3>
             <div className="inventory-grid">
               {availableIngredients.map((ing, idx) => {
                 const isLocked = idx >= ingLimit;
-                const requiredTier = idx < 25 ? 'PRO' : 'PREMIUM';
+                const requiredTier = idx >= ACCESS_CONFIGS.PRO.features.ingredientsLimit ? 'PREMIUM' : 'PRO';
                 return (
                   <div key={ing.id} className="inv-btn-container" style={{ position: 'relative' }}>
                     <button
                       className={`inv-btn ${slotA?.id === ing.id || slotB?.id === ing.id ? 'active' : ''} ${isLocked ? 'locked' : ''}`}
                       style={isLocked ? { pointerEvents: 'none', userSelect: 'none' } : {}}
                       onClick={() => {
-                        if (!slotA) setSlotA(ing);
-                        else if (!slotB) setSlotB(ing);
-                        else { setSlotA(ing); setSlotB(null); setResult(null); }
+                        requireAuth(() => {
+                          if (!slotA) setSlotA(ing);
+                          else if (!slotB) setSlotB(ing);
+                          else { setSlotA(ing); setSlotB(null); setResult(null); }
+                        });
                       }}
                     >
                       <span className="dot"></span>
                       {ing.name}
                     </button>
-                    {!isLocked && <button className="inv-info-btn" onClick={() => setSelectedItem(ing)}>ℹ️</button>}
-                    {isLocked && <LockedOverlay requiredTier={requiredTier as 'PRO' | 'PREMIUM'} onUnlock={() => !authState.isRegistered ? openAuthModal() : window.location.href='/pricing'} />}
+                    {!isLocked && <button className="inv-info-btn" onClick={() => requireAuth(() => setSelectedItem(ing))}>i</button>}
+                    {isLocked && <LockedOverlay requiredTier={requiredTier as 'PRO' | 'PREMIUM'} onUnlock={() => requireAuth(() => { window.location.href = '/pricing'; })} />}
                   </div>
                 );
               })}
@@ -220,21 +322,22 @@ export default function Laboratory() {
           </div>
 
           <div className="tab-section special">
-            <h3 className="tab-title">TÉCNICAS ({techLimit}/{techniques.length}) — NIVEL {userLevel}</h3>
+            <h3 className="tab-title">TÉCNICAS ({techLimit}/{techniquesData.length}) - NIVEL {userLevel}</h3>
             <div className="inventory-grid">
               {availableTechniques.map((tech, idx) => {
                 const isLocked = idx >= techLimit;
+                const requiredTier = idx >= ACCESS_CONFIGS.PRO.features.techniquesLimit ? 'PREMIUM' : 'PRO';
                 return (
                   <div key={tech.id} className="inv-btn-container" style={{ position: 'relative' }}>
                     <button
                       className={`tech-btn ${slotTech?.id === tech.id ? 'active' : ''} ${isLocked ? 'locked' : ''}`}
                       style={isLocked ? { pointerEvents: 'none', userSelect: 'none' } : {}}
-                      onClick={() => setSlotTech(tech)}
+                      onClick={() => requireAuth(() => setSlotTech(tech))}
                     >
                       {tech.name}
                     </button>
-                    {!isLocked && <button className="inv-info-btn" onClick={() => setSelectedItem(tech)}>ℹ️</button>}
-                    {isLocked && <LockedOverlay requiredTier="PREMIUM" onUnlock={() => !authState.isRegistered ? openAuthModal() : window.location.href='/pricing'} />}
+                    {!isLocked && <button className="inv-info-btn" onClick={() => requireAuth(() => setSelectedItem(tech))}>i</button>}
+                    {isLocked && <LockedOverlay requiredTier={requiredTier as 'PRO' | 'PREMIUM'} onUnlock={() => requireAuth(() => { window.location.href = '/pricing'; })} />}
                   </div>
                 );
               })}
@@ -255,7 +358,7 @@ export default function Laboratory() {
         .lab-header { text-align: center; margin-bottom: 80px; position: relative; }
         
         .tier-switcher { position: absolute; top: 0; left: 0; padding: 10px; border-radius: 15px; display: flex; gap: 10px; align-items: center; border: 1px solid var(--border); }
-        .tier-switcher button { background: none; border: 1px solid var(--border); color: white; padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 0.7rem; }
+        .tier-switcher button { background: none; border: 1px solid var(--border); color: var(--foreground); padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 0.7rem; }
         .tier-switcher button.active { background: var(--primary); border-color: var(--primary); }
         .tier-switcher small { font-size: 0.6rem; opacity: 0.5; font-weight: 800; }
 
@@ -272,7 +375,7 @@ export default function Laboratory() {
         .node-name, .tech-name { font-size: 1.4rem; font-weight: 900; color: var(--primary); display: block; line-height: 1.1; }
 
         .mix-column { display: flex; flex-direction: column; align-items: center; }
-        .mix-core { width: 100px; height: 100px; border-radius: 50%; border: 4px solid var(--primary); background: none; color: white; font-weight: 900; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; transition: all 0.5s ease; box-shadow: 0 0 20px var(--primary-glow); }
+        .mix-core { width: 100px; height: 100px; border-radius: 50%; border: 4px solid var(--primary); background: none; color: var(--foreground); font-weight: 900; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; transition: all 0.5s ease; box-shadow: 0 0 20px var(--primary-glow); }
         .mix-core:disabled { opacity: 0.3; filter: grayscale(1); }
 
         .stability-predictor { margin-top: 40px; width: 100%; max-width: 600px; margin-inline: auto; }
@@ -289,6 +392,18 @@ export default function Laboratory() {
         .panel-badge { font-size: 0.7rem; font-weight: 900; color: var(--primary); margin-bottom: 20px; letter-spacing: 2px; }
         .analysis-text { line-height: 1.8; opacity: 0.8; font-size: 1.1rem; }
 
+        .recipe-suggestions { margin-top: 20px; padding: 20px; border-radius: 18px; border: 1px solid var(--border); background: rgba(255,255,255,0.02); }
+        .suggest-header { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+        .suggest-header h3 { margin: 0; }
+        .suggest-header p { opacity: 0.6; margin: 0; font-size: 0.9rem; }
+        .recipe-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+        .recipe-chip { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border); background: rgba(255,255,255,0.02); }
+        .recipe-chip.locked { opacity: 0.6; }
+        .chip-title { font-weight: 800; }
+        .chip-meta { font-size: 0.85rem; opacity: 0.6; }
+        .unlock-btn { background: none; border: 1px solid var(--primary); color: var(--primary); padding: 8px 12px; border-radius: 10px; cursor: pointer; font-weight: 800; }
+        .empty-recipes { opacity: 0.6; margin: 10px 0; }
+
         .inventory-tabs { display: grid; grid-template-columns: 2fr 1fr; gap: 40px; margin-top: 80px; }
         .tab-title { font-size: 0.8rem; letter-spacing: 2px; margin-bottom: 30px; opacity: 0.5; }
         .inventory-grid { display: flex; flex-wrap: wrap; gap: 10px; }
@@ -299,9 +414,9 @@ export default function Laboratory() {
         .inv-btn.active, .tech-btn.active { background: var(--primary); border-color: var(--primary); color: white; box-shadow: var(--neon-shadow); }
 
         .inv-info-btn { 
-          background: rgba(255,255,255,0.05); 
+          background: var(--card-bg); 
           border: 1px solid var(--border); 
-          color: white; 
+          color: var(--foreground); 
           border-radius: 10px; 
           width: 40px; 
           cursor: pointer; 
@@ -357,3 +472,4 @@ export default function Laboratory() {
     </div>
   );
 }
+

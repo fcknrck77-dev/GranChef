@@ -40,6 +40,22 @@ async function main() {
     console.log(`Anon SELECT courses: OK (rows=${(anonCourses.data || []).length})`);
   }
 
+  const anonIngredients = await anonClient.from('ingredients').select('id').limit(1);
+  if (anonIngredients.error) {
+    console.log('Anon SELECT ingredients: FAIL');
+    console.log(String(anonIngredients.error.message || anonIngredients.error));
+  } else {
+    console.log(`Anon SELECT ingredients: OK (rows=${(anonIngredients.data || []).length})`);
+  }
+
+  const anonTechniques = await anonClient.from('techniques').select('id').limit(1);
+  if (anonTechniques.error) {
+    console.log('Anon SELECT techniques: FAIL');
+    console.log(String(anonTechniques.error.message || anonTechniques.error));
+  } else {
+    console.log(`Anon SELECT techniques: OK (rows=${(anonTechniques.data || []).length})`);
+  }
+
   if (!adminClient) {
     console.log('Service SELECT app_users: SKIP (missing SUPABASE_SERVICE_ROLE_KEY)');
   } else {
