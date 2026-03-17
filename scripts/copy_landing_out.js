@@ -27,6 +27,26 @@ async function copyRecursive(src, dest) {
   await fsp.copyFile(src, dest);
 }
 
+async function ensurePhpIndexes(rootDir) {
+  const php = "<?php\\nreadfile(__DIR__ . '/index.html');\\n";
+
+  async function walk(dir) {
+    const entries = await fsp.readdir(dir, { withFileTypes: true });
+    const hasIndexHtml = entries.some((e) => e.isFile() && e.name.toLowerCase() === 'index.html');
+    const hasIndexPhp = entries.some((e) => e.isFile() && e.name.toLowerCase() === 'index.php');
+
+    if (hasIndexHtml && !hasIndexPhp) {
+      await fsp.writeFile(path.join(dir, 'index.php'), php, 'utf8');
+    }
+
+    for (const e of entries) {
+      if (e.isDirectory()) await walk(path.join(dir, e.name));
+    }
+  }
+
+  await walk(rootDir);
+}
+
 async function main() {
   const root = process.cwd();
   const srcOut = path.join(root, 'out');
@@ -83,6 +103,9 @@ async function main() {
     }
   }
 
+  // Generate index.php in each route folder for hosts that prioritize PHP (DirectoryIndex index.php).
+  await ensurePhpIndexes(destOut);
+
   console.log(`OK: generado ${path.relative(root, destOut)} con contenido de landing.`);
 }
 
@@ -90,4 +113,3 @@ main().catch((err) => {
   console.error(err);
   process.exit(1);
 });
-

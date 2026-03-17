@@ -7,6 +7,7 @@ import { Phone, AtSign, CreditCard } from 'lucide-react';
 export default function PaymentSettings() {
   const [settings, setSettings] = useState(INITIAL_SETTINGS);
   const [isSaving, setIsSaving] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
 
   const handleSave = () => {
     setIsSaving(true);
@@ -14,6 +15,25 @@ export default function PaymentSettings() {
       setIsSaving(false);
       alert('Configuración actualizada correctamente.');
     }, 1000);
+  };
+
+  const handleReset = async () => {
+    const first = confirm('Vas a resetear en Supabase: usuarios (excepto tu cuenta admin), ingresos/historial, sorteos y colas del motor. Continuar?');
+    if (!first) return;
+    const typed = prompt('Escribe RESET para confirmar. Esta accion no se puede deshacer.');
+    if (typed !== 'RESET') return;
+
+    setIsResetting(true);
+    try {
+      const res = await fetch('/api/admin/reset', { method: 'POST' });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || 'reset_failed');
+      alert('Reset completado. La base de datos de usuarios/ingresos/sorteos ha quedado a cero (excepto tu cuenta).');
+    } catch (e: any) {
+      alert(`No se pudo resetear: ${e?.message || 'error'}`);
+    } finally {
+      setIsResetting(false);
+    }
   };
 
   return (
@@ -76,6 +96,14 @@ export default function PaymentSettings() {
         </button>
       </div>
 
+      <div className="danger-zone glass">
+        <h3>ZONA DE MANTENIMIENTO</h3>
+        <p>Resetea datos operativos (usuarios salvo tu cuenta, ingresos/historial, sorteos y colas del motor).</p>
+        <button className="danger-btn" onClick={handleReset} disabled={isResetting}>
+          {isResetting ? 'Reseteando...' : 'Resetear Base de Datos'}
+        </button>
+      </div>
+
       <style jsx>{`
         .page-header { margin-bottom: 50px; }
         .page-header h1 { font-size: 3rem; }
@@ -97,6 +125,26 @@ export default function PaymentSettings() {
         .save-btn { padding: 20px 60px; border-radius: 50px; background: var(--primary); border: none; color: white; font-weight: 800; cursor: pointer; text-transform: uppercase; transition: var(--transition); box-shadow: var(--neon-shadow); }
         .save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .save-btn:hover:not(:disabled) { transform: translateY(-3px); opacity: 0.9; }
+
+        .danger-zone {
+          margin-top: 40px;
+          padding: 30px;
+          border-radius: 22px;
+          border: 1px solid rgba(255, 0, 85, 0.25);
+          background: rgba(255, 0, 85, 0.06);
+        }
+        .danger-zone h3 { letter-spacing: 3px; font-size: 0.9rem; margin-bottom: 10px; color: var(--primary); }
+        .danger-zone p { opacity: 0.8; margin-bottom: 18px; }
+        .danger-btn {
+          padding: 14px 18px;
+          border-radius: 14px;
+          border: 1px solid rgba(255, 0, 85, 0.35);
+          background: rgba(255, 0, 85, 0.15);
+          color: var(--foreground);
+          font-weight: 900;
+          cursor: pointer;
+        }
+        .danger-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
         @media (max-width: 600px) {
           .settings-grid { grid-template-columns: 1fr; }
