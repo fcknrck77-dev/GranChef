@@ -12,12 +12,7 @@ export default async function handler(req, res) {
       process.env.SUPABASE_SERVICE_ROLE_KEY
     )
 
-    const { user_id } = req.query
-
-    if (!user_id) {
-      return res.status(400).json({ error: "Missing user_id" })
-    }
-
+   
    const { data, error } = await supabase
   .from('profiles')
   .select('*')
