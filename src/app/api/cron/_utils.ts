@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import supabaseCore from '@/lib/supabase/core';
-import supabaseCourses from '@/lib/supabase/courses';
-import supabaseAi from '@/lib/supabase/ai';
-import supabaseMarketing from '@/lib/supabase/marketing';
-import supabaseLogs from '@/lib/supabase/logs';
+import getCoreClient from '@/lib/supabase/core';
+import getCoursesClient from '@/lib/supabase/courses';
+import getAiClient from '@/lib/supabase/ai';
+import getMarketingClient from '@/lib/supabase/marketing';
+import getLogsClient from '@/lib/supabase/logs';
 export function requireCronSecret(req: Request) {
   const secret = process.env.CRON_SECRET || '';
   if (!secret) {
@@ -22,11 +22,11 @@ export function requireCronSecret(req: Request) {
 export function requireSupabaseAdminCron(domain: 'CORE' | 'COURSES' | 'AI_BRAIN' | 'MARKETING' | 'LOGS' = 'CORE') {
   let supabase = null;
   switch (domain) {
-    case 'CORE': supabase = supabaseCore; break;
-    case 'COURSES': supabase = supabaseCourses; break;
-    case 'AI_BRAIN': supabase = supabaseAi; break;
-    case 'MARKETING': supabase = supabaseMarketing; break;
-    case 'LOGS': supabase = supabaseLogs; break;
+    case 'CORE': supabase = getCoreClient(); break;
+    case 'COURSES': supabase = getCoursesClient(); break;
+    case 'AI_BRAIN': supabase = getAiClient(); break;
+    case 'MARKETING': supabase = getMarketingClient(); break;
+    case 'LOGS': supabase = getLogsClient(); break;
   }
   if (!supabase) {
     return { ok: false as const, response: NextResponse.json({ error: `supabase_${domain.toLowerCase()}_not_configured` }, { status: 503 }) };

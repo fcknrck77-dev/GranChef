@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin, requireSupabaseAdmin } from '../../_utils';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(_: Request, ctx: { params: Promise<{ id: string }> }) {
   const gate = await requireAdmin();
   if (!gate.ok) return gate.response;

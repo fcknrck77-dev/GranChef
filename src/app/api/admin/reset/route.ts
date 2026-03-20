@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin, requireSupabaseAdmin } from '../_utils';
 
+export const dynamic = 'force-dynamic';
+
 const ZERO_DATE = '1970-01-01T00:00:00.000Z';
 
 export async function POST() {

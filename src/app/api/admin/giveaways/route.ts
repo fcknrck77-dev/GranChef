@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin, requireSupabaseAdmin } from '../_utils';
 
+export const dynamic = 'force-dynamic';
+
 type Reward =
   | { type: 'none' }
   | { type: 'plan_override'; plan: 'FREE' | 'PRO' | 'PREMIUM'; days: number }

@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin, requireSupabaseAdmin } from '../_utils';
+
+export const dynamic = 'force-dynamic';
 import { fulfillAiRequest } from '@/lib/ai_service';
 
 type CreateBody = {

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { requireAdmin, requireSupabaseAdmin } from '../../_utils';
 import { generateCourseCycle } from '@/lib/gastronomic_engine';
 
+export const dynamic = 'force-dynamic';
+
 function nextCycleDueFrom(latestCreatedAt: string) {
   const lastDate = new Date(latestCreatedAt);
   return new Date(lastDate.getTime() + 96 * 3600 * 1000);
@@ -10,7 +12,7 @@ function nextCycleDueFrom(latestCreatedAt: string) {
 export async function GET(req: Request) {
   const gate = await requireAdmin();
   if (!gate.ok) return gate.response;
-  const supa = requireSupabaseAdmin();
+  const supa = requireSupabaseAdmin('LOGS');
   if (!supa.ok) return supa.response;
 
   // Get latest cycle
@@ -52,7 +54,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const gate = await requireAdmin();
   if (!gate.ok) return gate.response;
-  const supa = requireSupabaseAdmin();
+  const supa = requireSupabaseAdmin('LOGS');
   if (!supa.ok) return supa.response;
 
   // Determine cooldown

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin, requireSupabaseAdmin } from '../../_utils';
 
+export const dynamic = 'force-dynamic';
+
 type PatchBody = {
   status?: 'active' | 'blocked' | 'suspended';
   plan?: 'FREE' | 'PRO' | 'PREMIUM';

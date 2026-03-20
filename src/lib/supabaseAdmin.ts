@@ -15,8 +15,8 @@ export function getSupabaseAdmin(domain: SupabaseDomain = 'CORE') {
 
   // Fallback for CORE if specific wasn't found (though we added it)
   if (!url || !key) {
-    url = process.env.SUPABASE_URL;
-    key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    url = process.env.SUPABASE_URL || 'https://yqjwqhncofynnkezkuur.supabase.co';
+    key = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy';
   }
 
   if (!url || !key) return null;

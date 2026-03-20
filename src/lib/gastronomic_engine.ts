@@ -1,6 +1,6 @@
-import supabaseCore from './supabase/core';
-import supabaseCourses from './supabase/courses';
-import supabaseLogs from './supabase/logs';
+import getCoreClient from './supabase/core';
+import getCoursesClient from './supabase/courses';
+import getLogsClient from './supabase/logs';
 import { GoogleGenAI } from '@google/genai';
 
 export interface GeneratedCourse {
@@ -177,8 +177,8 @@ function pickTopicsForCycle(tiers: string[]): string[] {
 //  MAIN CYCLE
 // ─────────────────────────────────────────────────────────────────────────────
 export async function generateCourseCycle() {
-  const supaLogs = supabaseLogs;
-  const supaCourses = supabaseCourses;
+  const supaLogs = getLogsClient();
+  const supaCourses = getCoursesClient();
   
   if (!supaLogs || !supaCourses) throw new Error('Supabase Shards (LOGS or COURSES) not configured');
 

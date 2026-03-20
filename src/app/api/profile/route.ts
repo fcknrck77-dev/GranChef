@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import supabaseCore from '@/lib/supabase/core';
+import getCoreClient from '@/lib/supabase/core';
 
 export async function GET(req: Request) {
   try {
@@ -11,7 +11,7 @@ export async function GET(req: Request) {
     }
 
     // Query app_users using the CORE Supabase client (service role key, bypasses RLS)
-    const { data: user, error } = await supabaseCore
+    const { data: user, error } = await getCoreClient()
       .from('app_users')
       .select('*')
       .eq('id', id)
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
     }
 
-    const { data: user, error } = await supabaseCore
+    const { data: user, error } = await getCoreClient()
       .from('app_users')
       .select('*')
       .eq('id', id)

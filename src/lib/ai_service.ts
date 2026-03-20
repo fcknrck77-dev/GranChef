@@ -1,6 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
-import supabaseAi from './supabase/ai';
-import supabaseLogs from './supabase/logs';
+import getAiClient from './supabase/ai';
+import getLogsClient from './supabase/logs';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  SYSTEM IDENTITY - THE REDACTOR MAESTRO (Shared for all content)
@@ -124,8 +124,8 @@ DEVUELVE SOLO EL JSON:
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function fulfillAiRequest(requestId: string) {
-  const supaLogs = supabaseLogs;
-  const supaAiBrain = supabaseAi;
+  const supaLogs = getLogsClient();
+  const supaAiBrain = getAiClient();
   
   if (!supaLogs || !supaAiBrain) throw new Error('Supabase Shards (LOGS or AI_BRAIN) not configured');
 

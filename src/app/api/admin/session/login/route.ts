@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { setAdminSession } from '@/lib/adminSession';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null) as { username?: string; password?: string } | null;
   const username = body?.username || '';

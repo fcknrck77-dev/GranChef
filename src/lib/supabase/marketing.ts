@@ -1,11 +1,15 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseMarketing = createClient(
-  process.env.SUPABASE_MARKETING_URL as string,
-  process.env.SUPABASE_MARKETING_SERVICE_KEY as string,
-  {
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
-  }
-);
+let client: SupabaseClient | null = null;
 
-export default supabaseMarketing;
+export default function getMarketingClient(): SupabaseClient {
+  if (client) return client;
+  client = createClient(
+    (process.env.SUPABASE_MARKETING_URL || 'https://bvavomfudfolsxvgowjm.supabase.co'),
+    (process.env.SUPABASE_MARKETING_SERVICE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy'),
+    {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+    }
+  );
+  return client;
+}
