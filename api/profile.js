@@ -18,11 +18,10 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Missing user_id" })
     }
 
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user_id)
-      .single()
+   const { data, error } = await supabase
+  .from('profiles')
+  .select('*')
+  .limit(1)
 
     if (error) {
       return res.status(500).json({ error: error.message })
