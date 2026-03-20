@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
-
+if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  throw new Error("NO SERVICE ROLE KEY")
+}
 export default async function handler(req, res) {
   try {
     // DEBUG: comprobar si la clave existe
