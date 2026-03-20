@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
-
+import supabaseCore from '@/lib/supabase/core';
+import supabaseCourses from '@/lib/supabase/courses';
+import supabaseAi from '@/lib/supabase/ai';
+import supabaseMarketing from '@/lib/supabase/marketing';
+import supabaseLogs from '@/lib/supabase/logs';
 export function requireCronSecret(req: Request) {
   const secret = process.env.CRON_SECRET || '';
   if (!secret) {
@@ -16,10 +19,17 @@ export function requireCronSecret(req: Request) {
   return { ok: true as const };
 }
 
-export function requireSupabaseAdminCron() {
-  const supabase = getSupabaseAdmin();
+export function requireSupabaseAdminCron(domain: 'CORE' | 'COURSES' | 'AI_BRAIN' | 'MARKETING' | 'LOGS' = 'CORE') {
+  let supabase = null;
+  switch (domain) {
+    case 'CORE': supabase = supabaseCore; break;
+    case 'COURSES': supabase = supabaseCourses; break;
+    case 'AI_BRAIN': supabase = supabaseAi; break;
+    case 'MARKETING': supabase = supabaseMarketing; break;
+    case 'LOGS': supabase = supabaseLogs; break;
+  }
   if (!supabase) {
-    return { ok: false as const, response: NextResponse.json({ error: 'supabase_not_configured' }, { status: 503 }) };
+    return { ok: false as const, response: NextResponse.json({ error: `supabase_${domain.toLowerCase()}_not_configured` }, { status: 503 }) };
   }
   return { ok: true as const, supabase };
 }

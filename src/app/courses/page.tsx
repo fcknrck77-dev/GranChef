@@ -27,7 +27,7 @@ export default function Courses() {
   useEffect(() => {
     async function fetchCourses() {
       setLoading(true);
-      const supabase = getSupabase();
+      const supabase = getSupabase('COURSES');
       if (!supabase) {
         setDbCourses(localCourses);
         setLoading(false);
@@ -61,7 +61,7 @@ export default function Courses() {
 
   async function ensureCourseModules(course: Course): Promise<Course> {
     if (course.modules && course.modules.length > 0) return course;
-    const supabase = getSupabase();
+    const supabase = getSupabase('COURSES');
     if (!supabase) return course;
     const { data, error } = await supabase.from('courses').select('modules').eq('id', course.id).maybeSingle();
     if (error || !data) return course;

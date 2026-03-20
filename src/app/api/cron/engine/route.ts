@@ -10,7 +10,7 @@ function nextCycleDueFrom(latestCreatedAt: string) {
 export async function POST(req: Request) {
   const gate = requireCronSecret(req);
   if (!gate.ok) return gate.response;
-  const supa = requireSupabaseAdminCron();
+  const supa = requireSupabaseAdminCron('LOGS');
   if (!supa.ok) return supa.response;
 
   const now = new Date();

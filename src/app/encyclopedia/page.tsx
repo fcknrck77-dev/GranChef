@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import { ingredients as localIngredients, Ingredient } from '@/data/ingredients';
@@ -29,7 +29,7 @@ export default function Encyclopedia() {
       .replace(/[^a-z0-9_-]+/g, '');
 
   useEffect(() => {
-    const supabase = getSupabase();
+    const supabase = getSupabase('AI_BRAIN');
     if (!supabase) return;
 
     (async () => {

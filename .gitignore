@@ -65,3 +65,6 @@ ingredients_generated.ts
 /android/app/build/
 /android/local.properties
 /apk/
+
+.vercel
+.env*.local

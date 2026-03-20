@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useState } from 'react';
 import { ingredients as localIngredients, Ingredient } from '@/data/ingredients';
@@ -38,7 +38,7 @@ export default function Laboratory() {
   const availableTechniques = techniquesData;
 
   useEffect(() => {
-    const supabase = getSupabase();
+    const supabase = getSupabase('AI_BRAIN');
     if (!supabase) return;
 
     (async () => {

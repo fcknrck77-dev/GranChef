@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { Ingredient } from '@/data/ingredients';
 import { Technique } from '@/data/techniques';
@@ -54,7 +54,7 @@ export default function DetailModal({ item, onClose }: DetailModalProps) {
   useEffect(() => {
     setRelated(localRelated.slice(0, 6));
 
-    const supabase = getSupabase();
+    const supabase = getSupabase('AI_BRAIN');
     if (!supabase) return;
 
     (async () => {

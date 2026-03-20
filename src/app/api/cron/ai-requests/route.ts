@@ -5,7 +5,7 @@ import { fulfillAiRequest } from '@/lib/ai_service';
 export async function POST(req: Request) {
   const gate = requireCronSecret(req);
   if (!gate.ok) return gate.response;
-  const supa = requireSupabaseAdminCron();
+  const supa = requireSupabaseAdminCron('LOGS');
   if (!supa.ok) return supa.response;
 
   const url = new URL(req.url);

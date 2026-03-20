@@ -45,7 +45,7 @@ export default function RecipesPage() {
   const config = ACCESS_CONFIGS[userLevel];
 
   useEffect(() => {
-    const supabase = getSupabase();
+    const supabase = getSupabase('AI_BRAIN');
     if (!supabase) return;
 
     (async () => {

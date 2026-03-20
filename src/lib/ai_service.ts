@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
-import { getSupabaseAdmin } from './supabaseAdmin';
+import supabaseAi from './supabase/ai';
+import supabaseLogs from './supabase/logs';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  SYSTEM IDENTITY - THE REDACTOR MAESTRO (Shared for all content)
@@ -123,18 +124,20 @@ DEVUELVE SOLO EL JSON:
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function fulfillAiRequest(requestId: string) {
-  const supa = getSupabaseAdmin();
-  if (!supa) throw new Error('Supabase Admin not configured');
+  const supaLogs = supabaseLogs;
+  const supaAiBrain = supabaseAi;
+  
+  if (!supaLogs || !supaAiBrain) throw new Error('Supabase Shards (LOGS or AI_BRAIN) not configured');
 
-  const { data: request, error: fetchErr } = await supa
+  const { data: request, error: fetchErr } = await supaLogs
     .from('ai_requests')
     .select('*')
     .eq('id', requestId)
     .single();
 
-  if (fetchErr || !request) throw new Error('Request not found');
+  if (fetchErr || !request) throw new Error('Request not found in LOGS shard');
 
-  await supa.from('ai_requests').update({ status: 'processing' }).eq('id', requestId);
+  await supaLogs.from('ai_requests').update({ status: 'processing' }).eq('id', requestId);
 
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
@@ -153,7 +156,6 @@ export async function fulfillAiRequest(requestId: string) {
       userPrompt = buildRecipePrompt(request.instruction);
       targetTable = 'recipes';
     } else {
-      // For now, only these three are fully handled here. Courses are in gastronomic_engine.
       throw new Error(`Unsupported kind: ${request.kind}`);
     }
 
@@ -170,7 +172,7 @@ export async function fulfillAiRequest(requestId: string) {
     const resultText = response.text;
     const resultJson = JSON.parse(resultText || '{}');
 
-    // Insert into final table (normalize to DB schema)
+    // Insert into final table (normalize to DB schema) in AI_BRAIN shard
     let rowToInsert: any = resultJson;
     if (request.kind === 'recipes') {
       rowToInsert = {
@@ -193,21 +195,21 @@ export async function fulfillAiRequest(requestId: string) {
       }
     }
 
-    const { error: insertErr } = await supa.from(targetTable).upsert(rowToInsert, { onConflict: 'id' });
+    const { error: insertErr } = await supaAiBrain.from(targetTable).upsert(rowToInsert, { onConflict: 'id' });
     if (insertErr) throw insertErr;
 
-    // Update request
-    await supa.from('ai_requests').update({ 
+    // Update request in LOGS shard
+    await supaLogs.from('ai_requests').update({ 
       status: 'completed',
       payload: resultJson 
     }).eq('id', requestId);
 
-    console.log(`[AI SERVICE] ✓ Fulfilled ${request.kind} request: ${resultJson.name}`);
+    console.log(`[AI SERVICE] ✓ Fulfilled ${request.kind} request in AI_BRAIN shard: ${resultJson.name || resultJson.title}`);
     return { ok: true, data: resultJson };
 
   } catch (err: any) {
     console.error(`[AI SERVICE] Error fulfilling request ${requestId}:`, err);
-    await supa.from('ai_requests').update({ status: 'failed' }).eq('id', requestId);
+    await supaLogs.from('ai_requests').update({ status: 'failed' }).eq('id', requestId);
     throw err;
   }
 }

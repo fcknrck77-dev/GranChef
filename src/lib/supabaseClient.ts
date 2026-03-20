@@ -1,15 +1,26 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-let cachedClient: SupabaseClient<any, any, any> | null = null;
+type SupabaseDomain = 'CORE' | 'COURSES' | 'AI_BRAIN' | 'MARKETING' | 'LOGS';
 
-export function getSupabase() {
-  if (cachedClient) return cachedClient;
+const cachedClients: Record<string, SupabaseClient<any, any, any>> = {};
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+export function getSupabase(domain: SupabaseDomain = 'CORE') {
+  if (cachedClients[domain]) return cachedClients[domain];
+
+  const urlKey = `NEXT_PUBLIC_SUPABASE_URL_${domain}`;
+  const anonKeyName = `NEXT_PUBLIC_SUPABASE_ANON_KEY_${domain}`;
+
+  let supabaseUrl = process.env[urlKey];
+  let supabaseKey = process.env[anonKeyName];
+
+  // Fallback for legacy/default
+  if (!supabaseUrl || !supabaseKey) {
+    supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  }
 
   if (!supabaseUrl || !supabaseKey) return null;
 
-  cachedClient = createClient<any>(supabaseUrl, supabaseKey);
-  return cachedClient;
+  cachedClients[domain] = createClient<any>(supabaseUrl, supabaseKey);
+  return cachedClients[domain];
 }

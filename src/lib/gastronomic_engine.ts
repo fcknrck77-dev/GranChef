@@ -1,4 +1,6 @@
-import { getSupabaseAdmin } from './supabaseAdmin';
+import supabaseCore from './supabase/core';
+import supabaseCourses from './supabase/courses';
+import supabaseLogs from './supabase/logs';
 import { GoogleGenAI } from '@google/genai';
 
 export interface GeneratedCourse {
@@ -175,11 +177,13 @@ function pickTopicsForCycle(tiers: string[]): string[] {
 //  MAIN CYCLE
 // ─────────────────────────────────────────────────────────────────────────────
 export async function generateCourseCycle() {
-  const supa = getSupabaseAdmin();
-  if (!supa) throw new Error('Supabase Admin not configured');
+  const supaLogs = supabaseLogs;
+  const supaCourses = supabaseCourses;
+  
+  if (!supaLogs || !supaCourses) throw new Error('Supabase Shards (LOGS or COURSES) not configured');
 
   const cycleId = `cycle-${new Date().toISOString().split('T')[0]}-${Math.floor(Math.random() * 1000)}`;
-  const { data: cycle, error: cycleErr } = await supa.from('engine_cycles').insert({
+  const { data: cycle, error: cycleErr } = await supaLogs.from('engine_cycles').insert({
     cycle_id: cycleId,
     status: 'processing'
   }).select().single();
@@ -238,7 +242,7 @@ export async function generateCourseCycle() {
 
       const wordCount = result.full_content.split(/\s+/).length;
 
-      const { error: courseErr } = await supa.from('courses').insert({
+      const { error: courseErr } = await supaCourses.from('courses').insert({
         title: result.title,
         description: result.description,
         instructor: 'Grand Chef',
@@ -253,20 +257,20 @@ export async function generateCourseCycle() {
         continue;
       }
 
-      console.log(`[GrandChef Engine] ✓ ${tier} course saved: "${result.title}" (${wordCount} words)`);
+      console.log(`[GrandChef Engine] ✓ ${tier} course saved in COURSES shard: "${result.title}" (${wordCount} words)`);
     }
 
-    await supa.from('engine_cycles').update({
+    await supaLogs.from('engine_cycles').update({
       status: 'completed',
       completed_at: new Date().toISOString()
     }).eq('id', cycle.id);
 
-    console.log(`[GrandChef Engine] ✓ Cycle ${cycleId} completed.`);
+    console.log(`[GrandChef Engine] ✓ Cycle ${cycleId} completed in LOGS shard.`);
     return { ok: true, cycleId };
 
   } catch (err: any) {
     console.error('[GrandChef Engine] Cycle failed:', err);
-    await supa.from('engine_cycles').update({ status: 'failed' }).eq('id', cycle.id);
+    await supaLogs.from('engine_cycles').update({ status: 'failed' }).eq('id', cycle.id);
     throw err;
   }
 }

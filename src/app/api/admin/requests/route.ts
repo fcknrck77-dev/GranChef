@@ -12,7 +12,7 @@ type CreateBody = {
 export async function GET(req: Request) {
   const gate = await requireAdmin();
   if (!gate.ok) return gate.response;
-  const supa = requireSupabaseAdmin();
+  const supa = requireSupabaseAdmin('LOGS');
   if (!supa.ok) return supa.response;
 
   const url = new URL(req.url);
@@ -31,7 +31,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const gate = await requireAdmin();
   if (!gate.ok) return gate.response;
-  const supa = requireSupabaseAdmin();
+  const supa = requireSupabaseAdmin('LOGS');
   if (!supa.ok) return supa.response;
 
   const body = (await req.json().catch(() => null)) as CreateBody | null;

@@ -4,7 +4,7 @@ import { requireAdmin, requireSupabaseAdmin } from '../_utils';
 export async function GET(req: Request) {
   const gate = await requireAdmin();
   if (!gate.ok) return gate.response;
-  const supa = requireSupabaseAdmin();
+  const supa = requireSupabaseAdmin('CORE');
   if (!supa.ok) return supa.response;
 
   const url = new URL(req.url);

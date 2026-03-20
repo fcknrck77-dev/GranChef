@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
-
+import supabaseCourses from '@/lib/supabase/courses';
 const DEMO_TESTS: Record<string, any> = {
   'local-free-01': {
     course_id: 'local-free-01',
@@ -41,7 +40,7 @@ const DEMO_TESTS: Record<string, any> = {
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: rawId } = await params;
   const id = rawId?.toLowerCase().trim();
-  const supa = getSupabaseAdmin();
+  const supa = supabaseCourses;
   if (!supa) return NextResponse.json({ error: 'supabase_not_configured' }, { status: 503 });
 
   let testData: any = null;

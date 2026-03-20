@@ -13,7 +13,7 @@ type PatchBody = {
 export async function GET(_: Request, ctx: { params: Promise<{ id: string }> }) {
   const gate = await requireAdmin();
   if (!gate.ok) return gate.response;
-  const supa = requireSupabaseAdmin();
+  const supa = requireSupabaseAdmin('CORE');
   if (!supa.ok) return supa.response;
 
   const { id } = await ctx.params;
@@ -28,7 +28,7 @@ export async function GET(_: Request, ctx: { params: Promise<{ id: string }> }) 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const gate = await requireAdmin();
   if (!gate.ok) return gate.response;
-  const supa = requireSupabaseAdmin();
+  const supa = requireSupabaseAdmin('CORE');
   if (!supa.ok) return supa.response;
 
   const { id } = await ctx.params;

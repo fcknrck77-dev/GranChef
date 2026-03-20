@@ -33,6 +33,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "playwright": "^1.54.0",
     "typescript": "^5"
   }
 }
