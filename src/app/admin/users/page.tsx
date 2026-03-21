@@ -2,62 +2,34 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import {
-  demoBlockOverdueUsers,
-  demoEffectivePlan,
-  demoListGiveaways,
-  demoListUsers,
-  demoMarkPaid,
-  demoOverdueDays,
-  demoRunGiveaway,
-  demoSetPlan,
-  demoSetPlanOverride,
-  demoSetStatus,
-  type DemoPlan,
-  type GiveawayEligibility,
-} from '@/lib/demoUsersStore';
 
 export default function AdminUsersPage() {
   const [query, setQuery] = useState('');
   const [refresh, setRefresh] = useState(0);
-  const [backend, setBackend] = useState<'demo' | 'supabase'>('demo');
-  const [serverUsers, setServerUsers] = useState<any[]>([]);
-  const [serverGiveaways, setServerGiveaways] = useState<any[]>([]);
-
-  const users = useMemo(() => (backend === 'demo' ? demoListUsers(query) : serverUsers), [backend, query, refresh, serverUsers]);
-  const giveaways = useMemo(() => (backend === 'demo' ? demoListGiveaways() : serverGiveaways), [backend, refresh, serverGiveaways]);
-
-  useEffect(() => {
-    // Ensure seed on first load
-    demoListUsers();
-  }, []);
+  const [users, setUsers] = useState<any[]>([]);
+  const [giveaways, setGiveaways] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
+      setLoading(true);
       try {
         const res = await fetch(`/api/admin/users?q=${encodeURIComponent(query)}`, { cache: 'no-store' });
-        if (res.status === 503) {
-          if (!cancelled) setBackend('demo');
-          return;
-        }
-        if (!res.ok) {
-          if (!cancelled) setBackend('demo');
-          return;
-        }
-        const data = await res.json();
-        if (!cancelled) {
-          setBackend('supabase');
-          setServerUsers(Array.isArray(data?.users) ? data.users : []);
+        if (res.ok) {
+          const data = await res.json();
+          if (!cancelled) setUsers(Array.isArray(data?.users) ? data.users : []);
         }
 
         const gRes = await fetch('/api/admin/giveaways', { cache: 'no-store' });
         if (gRes.ok) {
           const gData = await gRes.json();
-          if (!cancelled) setServerGiveaways(Array.isArray(gData?.giveaways) ? gData.giveaways : []);
+          if (!cancelled) setGiveaways(Array.isArray(gData?.giveaways) ? gData.giveaways : []);
         }
-      } catch {
-        if (!cancelled) setBackend('demo');
+      } catch (err) {
+        console.error('Failed to load admin data:', err);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     }
     load();
@@ -66,28 +38,14 @@ export default function AdminUsersPage() {
 
   const forceRefresh = () => setRefresh(v => v + 1);
 
-  const [eligibility, setEligibility] = useState<GiveawayEligibility>('active_paid');
+  const [eligibility, setEligibility] = useState('active_paid');
   const [winnerCount, setWinnerCount] = useState(1);
   const [prize, setPrize] = useState<'pro7' | 'premium7' | 'manual'>('pro7');
   const [customPrize, setCustomPrize] = useState('Premio sorpresa');
 
   const runGiveaway = () => {
-    const prizeLabel =
-      prize === 'pro7' ? 'PRO 7 días' : prize === 'premium7' ? 'PREMIUM 7 días' : customPrize.trim() || 'Premio';
-    const rewardPlanOverride =
-      prize === 'pro7' ? { plan: 'PRO' as DemoPlan, days: 7 } : prize === 'premium7' ? { plan: 'PREMIUM' as DemoPlan, days: 7 } : undefined;
-
-    if (backend === 'demo') {
-      const record = demoRunGiveaway({
-        eligibility,
-        winnerCount: Number.isFinite(winnerCount) ? Math.max(1, winnerCount) : 1,
-        prizeLabel,
-        rewardPlanOverride,
-      });
-      alert(`Sorteo realizado. Ganadores: ${record.winners.map(w => w.name).join(', ') || 'Ninguno'}`);
-      forceRefresh();
-      return;
-    }
+    const prizeLabel = prize === 'pro7' ? 'PRO 7 días' : prize === 'premium7' ? 'PREMIUM 7 días' : customPrize.trim() || 'Premio';
+    const rewardPlanOverride = prize === 'pro7' ? { plan: 'PRO', days: 7 } : prize === 'premium7' ? { plan: 'PREMIUM', days: 7 } : undefined;
 
     fetch('/api/admin/giveaways', {
       method: 'POST',
@@ -105,7 +63,7 @@ export default function AdminUsersPage() {
         alert(`Sorteo realizado. Ganadores: ${(j?.winners || []).map((w: any) => w.name).join(', ') || 'Ninguno'}`);
         forceRefresh();
       })
-      .catch(() => alert('No se pudo ejecutar el sorteo en Supabase. Revisa /api/admin/health y tu configuración.'));
+      .catch((err) => alert(`Error al ejecutar sorteo: ${err.message}`));
   };
 
   return (
@@ -113,19 +71,16 @@ export default function AdminUsersPage() {
       <header className="page-header">
         <div className="head-left">
           <h1 className="neon-text">Usuarios</h1>
-          <p>Perfiles, pagos, planes, bloqueos y premios.</p>
+          <p>Gestión real de perfiles en el Shard CORE.</p>
         </div>
         <div className="head-actions">
-          <button className="btn subtle" onClick={() => { demoBlockOverdueUsers(1); forceRefresh(); }}>
-            Bloquear morosos
-          </button>
-          <button className="btn" onClick={forceRefresh}>Refrescar</button>
+          <button className="btn subtle" onClick={forceRefresh}>Refrescar</button>
         </div>
       </header>
 
       <section className="panel glass">
         <div className="panel-head">
-          <h2>Directorio</h2>
+          <h2>Directorio {loading && <small>(Cargando...)</small>}</h2>
           <input
             value={query}
             onChange={e => setQuery(e.target.value)}
@@ -145,12 +100,9 @@ export default function AdminUsersPage() {
           </div>
 
           {users.map(u => {
-            const effectivePlan = backend === 'demo'
-              ? demoEffectivePlan(u as any)
-              : ((u.plan_override && u.plan_override.until && (Date.now() < new Date(u.plan_override.until).getTime())) ? u.plan_override.plan : u.plan);
-            const overdue = backend === 'demo'
-              ? demoOverdueDays(u as any)
-              : (u.billing?.nextDueAt ? Math.max(0, Math.floor((Date.now() - new Date(u.billing.nextDueAt).getTime()) / (1000 * 60 * 60 * 24))) : null);
+            const hasOverride = u.plan_override && u.plan_override.until && (Date.now() < new Date(u.plan_override.until).getTime());
+            const effectivePlan = hasOverride ? u.plan_override.plan : u.plan;
+            const overdue = u.billing?.nextDueAt ? Math.max(0, Math.floor((Date.now() - new Date(u.billing.nextDueAt).getTime()) / (1000 * 60 * 60 * 24))) : null;
             const overdueLabel = overdue === null ? '-' : overdue === 0 ? '0 días' : `${overdue} días`;
             const paymentLabel = u.billing?.lastPaidAt ? new Date(u.billing.lastPaidAt).toLocaleDateString() : 'N/A';
             const isOverdue = overdue !== null && overdue > 0;
@@ -162,11 +114,8 @@ export default function AdminUsersPage() {
                   <small>{u.email}</small>
                 </div>
                 <div>
-                  <span className={`badge plan-${effectivePlan.toLowerCase()}`}>{effectivePlan}</span>
-                  {backend === 'demo' && (u as any).planOverride && (
-                    <small className="hint">override hasta {new Date((u as any).planOverride.until).toLocaleDateString()}</small>
-                  )}
-                  {backend === 'supabase' && u.plan_override?.until && (
+                  <span className={`badge plan-${(effectivePlan || 'FREE').toLowerCase()}`}>{effectivePlan}</span>
+                  {hasOverride && (
                     <small className="hint">override hasta {new Date(u.plan_override.until).toLocaleDateString()}</small>
                   )}
                 </div>
@@ -178,28 +127,18 @@ export default function AdminUsersPage() {
                 <div className="actions">
                   <Link className="btn link" href={`/admin/users/user?id=${encodeURIComponent(u.id)}`}>Perfil</Link>
                   <button className="btn subtle" onClick={() => {
-                    if (backend === 'demo') {
-                      demoMarkPaid(u.id);
-                      forceRefresh();
-                      return;
-                    }
                     fetch(`/api/admin/users/${u.id}`, {
                       method: 'PATCH',
                       headers: { 'content-type': 'application/json' },
                       body: JSON.stringify({ markPaid: true }),
                     }).finally(forceRefresh);
                   }}>
-                    Marcar pago
+                    Pago
                   </button>
                   <select
                     className="select"
                     value={u.plan}
                     onChange={e => {
-                      if (backend === 'demo') {
-                        demoSetPlan(u.id, e.target.value as DemoPlan, 'Admin');
-                        forceRefresh();
-                        return;
-                      }
                       fetch(`/api/admin/users/${u.id}`, {
                         method: 'PATCH',
                         headers: { 'content-type': 'application/json' },
@@ -215,11 +154,6 @@ export default function AdminUsersPage() {
                   <button
                     className="btn subtle"
                     onClick={() => {
-                      if (backend === 'demo') {
-                        demoSetStatus(u.id, u.status === 'blocked' ? 'active' : 'blocked', 'Admin');
-                        forceRefresh();
-                        return;
-                      }
                       fetch(`/api/admin/users/${u.id}`, {
                         method: 'PATCH',
                         headers: { 'content-type': 'application/json' },
@@ -228,24 +162,6 @@ export default function AdminUsersPage() {
                     }}
                   >
                     {u.status === 'blocked' ? 'Activar' : 'Bloquear'}
-                  </button>
-                  <button
-                    className="btn"
-                    onClick={() => {
-                      if (backend === 'demo') {
-                        demoSetPlanOverride(u.id, 'PREMIUM', 7, 'Premio manual');
-                        forceRefresh();
-                        return;
-                      }
-                      const until = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString();
-                      fetch(`/api/admin/users/${u.id}`, {
-                        method: 'PATCH',
-                        headers: { 'content-type': 'application/json' },
-                        body: JSON.stringify({ planOverride: { plan: 'PREMIUM', until, reason: 'Premio manual' } }),
-                      }).finally(forceRefresh);
-                    }}
-                  >
-                    Premiar
                   </button>
                 </div>
               </div>
@@ -256,17 +172,18 @@ export default function AdminUsersPage() {
 
       <section className="panel glass">
         <div className="panel-head">
-          <h2>Sorteos</h2>
-          <p className="muted">Selecciona elegibilidad y premio. Se registra el historial.</p>
+          <h2>Sorteos Reales</h2>
+          <p className="muted">Ejecución inmediata sobre la base de datos.</p>
         </div>
         <div className="giveaway-grid">
           <label>
             Elegibilidad
-            <select className="select" value={eligibility} onChange={e => setEligibility(e.target.value as GiveawayEligibility)}>
+            <select className="select" value={eligibility} onChange={e => setEligibility(e.target.value)}>
               <option value="all">Todos</option>
               <option value="active">Activos</option>
               <option value="active_paid">Activos y al día</option>
               <option value="pro_plus">PRO o PREMIUM</option>
+              <option value="overdue">Morosos</option>
             </select>
           </label>
           <label>
@@ -299,18 +216,12 @@ export default function AdminUsersPage() {
             <span>Premio</span>
             <span>Ganadores</span>
           </div>
-          {giveaways.slice(0, 8).map(g => (
+          {giveaways.slice(0, 10).map(g => (
             <div key={g.id} className="row">
               <span>{new Date(g.created_at).toLocaleString()}</span>
-              <span>{(g as any).eligibility}</span>
-              <span>{(g as any).prizeLabel ?? (g as any).prize_label}</span>
-              <span>
-                {Array.isArray((g as any).winners)
-                  ? (g as any).winners.map((w: any) => w.name).join(', ') || '-'
-                  : (typeof (g as any).winner_count === 'number'
-                      ? `${(g as any).winner_count} ganador(es)`
-                      : '-')}
-              </span>
+              <span>{g.eligibility}</span>
+              <span>{g.prize_label}</span>
+              <span>{g.winner_count} ganador(es)</span>
             </div>
           ))}
         </div>

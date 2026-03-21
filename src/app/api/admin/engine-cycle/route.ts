@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin, requireSupabaseAdmin } from '../../_utils';
+import { requireAdmin, requireSupabaseAdmin } from '../_utils';
 import { generateCourseCycle } from '@/lib/gastronomic_engine';
 
 export const dynamic = 'force-dynamic';
