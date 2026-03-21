@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Sparkles, Send, RefreshCw, Zap, Users, Shield, ShieldOff, Search } from 'lucide-react';
 
 interface ManagedUser {
