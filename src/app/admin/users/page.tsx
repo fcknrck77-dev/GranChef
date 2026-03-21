@@ -9,6 +9,8 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [giveaways, setGiveaways] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newUser, setNewUser] = useState({ name: '', email: '', plan: 'FREE', password: '', durationDays: 0 });
 
   useEffect(() => {
     let cancelled = false;
@@ -66,6 +68,28 @@ export default function AdminUsersPage() {
       .catch((err) => alert(`Error al ejecutar sorteo: ${err.message}`));
   };
 
+  const handleAddUser = async () => {
+    if (!newUser.email || !newUser.name) return alert('Email y nombre son obligatorios');
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(newUser),
+      });
+      if (res.ok) {
+        setShowAddModal(false);
+        setNewUser({ name: '', email: '', plan: 'FREE', password: '', durationDays: 0 });
+        forceRefresh();
+        alert('Usuario creado con éxito');
+      } else {
+        const error = await res.json();
+        alert(`Error: ${error.error || 'No se pudo crear el usuario'}`);
+      }
+    } catch (err) {
+      alert('Error de conexión');
+    }
+  };
+
   return (
     <div className="admin-users">
       <header className="page-header">
@@ -74,6 +98,7 @@ export default function AdminUsersPage() {
           <p>Gestión real de perfiles en el Shard CORE.</p>
         </div>
         <div className="head-actions">
+          <button className="btn" onClick={() => setShowAddModal(true)}>Nuevo Usuario</button>
           <button className="btn subtle" onClick={forceRefresh}>Refrescar</button>
         </div>
       </header>
@@ -150,19 +175,25 @@ export default function AdminUsersPage() {
                     <option value="FREE">FREE</option>
                     <option value="PRO">PRO</option>
                     <option value="PREMIUM">PREMIUM</option>
+                    <option value="ENTERPRISE">ENTERPRISE</option>
                   </select>
-                  <button
-                    className="btn subtle"
-                    onClick={() => {
+                  <select
+                    className="select"
+                    value={u.status}
+                    onChange={e => {
                       fetch(`/api/admin/users/${u.id}`, {
                         method: 'PATCH',
                         headers: { 'content-type': 'application/json' },
-                        body: JSON.stringify({ status: u.status === 'blocked' ? 'active' : 'blocked' }),
+                        body: JSON.stringify({ status: e.target.value }),
                       }).finally(forceRefresh);
                     }}
+                    aria-label="Cambiar estado"
                   >
-                    {u.status === 'blocked' ? 'Activar' : 'Bloquear'}
-                  </button>
+                    <option value="active">Activo</option>
+                    <option value="blocked">Bloqueado</option>
+                    <option value="suspended">Suspendido</option>
+                    <option value="cancelled">Cancelado</option>
+                  </select>
                 </div>
               </div>
             );
@@ -227,6 +258,42 @@ export default function AdminUsersPage() {
         </div>
       </section>
 
+      {showAddModal && (
+        <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
+          <div className="modal glass neon-border" onClick={e => e.stopPropagation()}>
+            <h2 className="neon-text">Nuevo Usuario</h2>
+            <div className="form">
+              <label>Nombre Completo
+                <input className="input" value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} placeholder="Ej: Juan Pérez" />
+              </label>
+              <label>Correo Electrónico
+                <input className="input" type="email" value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})} placeholder="email@ejemplo.com" />
+              </label>
+              <label>Contraseña (opcional)
+                <input className="input" type="password" value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} placeholder="Temp123!" />
+              </label>
+              <div className="form-row">
+                <label>Plan
+                  <select className="select" value={newUser.plan} onChange={e => setNewUser({...newUser, plan: e.target.value})}>
+                    <option value="FREE">FREE</option>
+                    <option value="PRO">PRO</option>
+                    <option value="PREMIUM">PREMIUM</option>
+                    <option value="ENTERPRISE">ENTERPRISE</option>
+                  </select>
+                </label>
+                <label>Duración (días)
+                  <input className="input" type="number" value={newUser.durationDays} onChange={e => setNewUser({...newUser, durationDays: parseInt(e.target.value || '0', 10)})} />
+                </label>
+              </div>
+              <div className="modal-actions">
+                <button className="btn subtle" onClick={() => setShowAddModal(false)}>Cancelar</button>
+                <button className="btn" onClick={handleAddUser}>Crear Usuario</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style jsx>{`
         .page-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; margin-bottom: 30px; }
         .head-left p { opacity: 0.5; margin-top: 10px; }
@@ -267,6 +334,16 @@ export default function AdminUsersPage() {
         label { display: flex; flex-direction: column; gap: 8px; font-weight: 800; opacity: 0.85; }
         .giveaway-actions { display: flex; align-items: flex-end; justify-content: flex-end; }
         .history { margin-top: 18px; border: 1px solid rgba(255,255,255,0.05); border-radius: 14px; overflow: hidden; }
+
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(10px); z-index: 2000; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .modal { width: 100%; max-width: 500px; padding: 40px; border-radius: 24px; position: relative; }
+        .modal h2 { margin-bottom: 30px; }
+        .form { display: flex; flex-direction: column; gap: 20px; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 15px; margin-top: 20px; }
+        .input { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border); background: rgba(0,0,0,0.4); color: white; outline: none; }
+        .input:focus { border-color: var(--primary); }
+
         @media (max-width: 900px) {
           .row { grid-template-columns: 1fr; }
           .actions { justify-content: flex-start; }

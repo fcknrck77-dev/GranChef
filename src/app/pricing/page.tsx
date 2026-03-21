@@ -20,24 +20,34 @@ export default function Pricing() {
     },
     { 
       name: 'PRO', 
-      priceMonthly: 19,
-      priceAnnual: 193,
-      originalAnnual: 228,
+      priceMonthly: 39,
+      priceAnnual: 398, // ~39 * 12 * 0.85
+      originalAnnual: 468,
       discount: 15,
-      features: ['Más de 500 ingredientes maestros', '10 técnicas de vanguardia', 'Recetario completo', 'Análisis molecular', 'Soporte prioritario'], 
+      features: ['200 Ingredientes maestros', '100 técnicas de vanguardia', '200 Recetas perfectas', 'Exámenes de nivel (25 ítems)', 'Acceso a 40 cursos'], 
       btn: 'Subir a PRO', 
       featured: true,
       href: appHref(`/checkout?tier=PRO&billing=${billing}`)
     },
     { 
       name: 'PREMIUM', 
-      priceMonthly: 49,
-      priceAnnual: 470,
-      originalAnnual: 588,
+      priceMonthly: 69,
+      priceAnnual: 662, 
+      originalAnnual: 828,
       discount: 20,
-      features: ['Todo ilimitado', 'Todas las técnicas', 'Bridges culinarios', 'Nuevos ingredientes mensuales', 'Acceso a masterclasses', 'Exportación a PDF e impresión'], 
+      features: ['Todo ilimitado', 'Exámenes magistrales (50 ítems)', '60 Cursos avanzados', 'Sinergias moleculares', 'Red Profesional (Candidato)'], 
       btn: 'Ser Premium', 
       href: appHref(`/checkout?tier=PREMIUM&billing=${billing}`)
+    },
+    { 
+      name: 'ENTERPRISE', 
+      priceMonthly: 149,
+      priceAnnual: 1341, // 149 * 12 * 0.75
+      originalAnnual: 1788,
+      discount: 25,
+      features: ['Perfiles de Empresa verificados', 'Publicación de Ofertas', 'Acceso a Talent Pool (CVs)', 'Mensajería privada cifrada', 'Soporte prioritario'], 
+      btn: 'Plan Empresa', 
+      href: appHref(`/checkout?tier=ENTERPRISE&billing=${billing}`)
     },
   ];
 

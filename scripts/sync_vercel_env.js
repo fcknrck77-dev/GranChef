@@ -24,7 +24,7 @@ for (const [key, val] of Object.entries(vars)) {
         console.log(`- Adding variable: ${key}...`);
         for (const env of envs) {
             // Using spawnSync to avoid shell escaping issues
-            const res = spawnSync('vercel', ['env', 'add', key, env, '--value', val, '--yes'], { encoding: 'utf8' });
+            const res = spawnSync('npx', ['vercel', 'env', 'add', key, env, '--value', val, '--yes'], { encoding: 'utf8', shell: true });
             if (res.status !== 0) {
                 console.error(`  ❌ Error adding ${key} to ${env}: ${res.stderr || res.stdout}`);
             }

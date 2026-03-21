@@ -1,13 +1,24 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MOCK_ORDERS, Order } from '@/data/adminSettings';
 import { CheckCircle2, Clock, CreditCard } from 'lucide-react';
 
 export default function OrderManager() {
-  const [orders, setOrders] = useState<Order[]>(MOCK_ORDERS);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'COMPLETED'>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    fetch('/api/admin/payments')
+      .then(r => r.json())
+      .then(data => {
+        setOrders(data.orders || []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
 
   const filteredOrders = orders.filter((o) => {
     const matchesFilter = filter === 'ALL' ? true : o.status === filter;
@@ -19,6 +30,7 @@ export default function OrderManager() {
   });
 
   const toggleStatus = (id: string) => {
+    // In production this would call an API to mark as validated/revoked
     setOrders(
       orders.map((o) => {
         if (o.id === id) {

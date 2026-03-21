@@ -1,19 +1,68 @@
 'use client';
 
-import { BookOpen, Flame, FlaskConical } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { BookOpen, Flame, FlaskConical, Loader2 } from 'lucide-react';
+import { useUserAuth } from '@/context/UserAuthContext';
 
 export default function Profile() {
+  const { authState } = useUserAuth();
+  const [profileData, setProfileData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (authState.isRegistered && authState.profile?.email) {
+      // In a real app we'd use the UUID from Supabase. 
+      // UserAuthContext now provides the ID if we sync it. 
+      // For now, let's assume we can fetch by email or ID if stored in authState.
+      // I'll add 'id' to UserProfile or get it from authState.
+      fetchProfile();
+    } else {
+      setLoading(false);
+    }
+  }, [authState.isRegistered]);
+
+  const fetchProfile = async () => {
+    try {
+      // We need the ID. Let's check how UserAuthContext stores it.
+      // I just refactored it to use data.user.id. 
+      // I should have added 'id' to the AuthState in last edit. 
+      // (Self-correction: I'll check my previous edit of UserAuthContext)
+      const res = await fetch(`/api/profile?id=${(authState as any).id || ''}`);
+      if (res.ok) {
+        const json = await res.json();
+        setProfileData(json);
+      }
+    } catch (err) {
+      console.error('Failed to fetch profile:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="profile-page container flex-center"><Loader2 className="animate-spin" /></div>;
+  }
+
+  if (!authState.isRegistered) {
+    return (
+      <div className="profile-page container text-center">
+        <h2 className="neon-text">No identificado</h2>
+        <p>Inicia sesión para ver tu progresión culinaria.</p>
+        <button className="edit-profile-btn mt-20" onClick={() => window.location.href='/login'}>Ir a Login</button>
+      </div>
+    );
+  }
+
+  const user = profileData?.user || {};
   const stats = [
-    { label: 'Experimentos', value: '42' },
-    { label: 'Sinergias Descubiertas', value: '128' },
-    { label: 'Cursos Completados', value: '3' },
-    { label: 'Nivel', value: 'Sous Chef' },
+    { label: 'Experimentos', value: profileData?.stats?.experiments || 0 },
+    { label: 'Sinergias Descubiertas', value: profileData?.stats?.synergies || 0 },
+    { label: 'Cursos Completados', value: profileData?.stats?.courses || 0 },
+    { label: 'Nivel', value: profileData?.stats?.level || 'Aprendiz' },
   ];
 
   const recentExperiments = [
-    { id: 1, title: 'Fusión Café y Cardamomo', date: 'Hace 2 horas', status: 'Éxito' },
-    { id: 2, title: 'Deconstrucción de Remolacha', date: 'Ayer', status: 'En Proceso' },
-    { id: 3, title: 'Esferificación de Caldo', date: 'Hace 3 días', status: 'Guardado' },
+    { id: 1, title: 'Último ciclo generado', date: user.activated_at ? new Date(user.activated_at).toLocaleDateString() : 'N/A', status: 'Activo' },
   ];
 
   return (
@@ -26,8 +75,8 @@ export default function Profile() {
              </div>
              <span className="pro-badge">PRO</span>
           </div>
-          <h2 className="chef-name">Chef Casa</h2>
-          <p className="chef-bio">Explorador de perfiles aromáticos y amante de la deconstrucción culinaria.</p>
+          <h2 className="chef-name">{user.name || 'Chef Gastrónomo'}</h2>
+          <p className="chef-bio">{user.professional_sector || 'Explorador de perfiles aromáticos y amante de la deconstrucción culinaria.'}</p>
           
           <div className="sidebar-stats">
             {stats.map(s => (

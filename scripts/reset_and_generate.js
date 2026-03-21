@@ -24,29 +24,7 @@ envContent.split('\n').forEach(line => {
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// API Keys rotation list
-const GEMINI_KEYS = [
-  process.env.GEMINI_API_KEY_1,
-  process.env.GEMINI_API_KEY_2,
-  process.env.GEMINI_API_KEY_3,
-  process.env.GEMINI_API_KEY_4,
-  process.env.GEMINI_API_KEY
-].filter(Boolean);
-
-let currentKeyIndex = 0;
-
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
-const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
-
-if (!SUPABASE_URL || !SUPABASE_KEY) {
-  console.error('❌ Faltan SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY en .env.local');
-  process.exit(1);
-}
-if (GEMINI_KEYS.length === 0) {
-  console.error('❌ Falta GEMINI_API_KEY en .env.local');
-  process.exit(1);
-}
+// ... (already replaced in main)
 
 const supa = createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -164,12 +142,44 @@ async function performGroqFallback(promptText) {
 // ─────────────────────────────────────────────────────────────────────────────
 //  MAIN
 // ─────────────────────────────────────────────────────────────────────────────
+const { OpenAI } = require('openai');
+
+function getActiveAiClient() {
+  const orKey = process.env.OPENROUTER_API_KEY;
+  const groqKey = process.env.GROQ_API_KEY;
+
+  if (orKey) {
+    return {
+      client: new OpenAI({
+        apiKey: orKey,
+        baseURL: 'https://openrouter.ai/api/v1',
+        defaultHeaders: {
+          'HTTP-Referer': 'https://grandchefapp.online',
+          'X-Title': 'GrandChef Reset Script',
+        }
+      }),
+      model: process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct',
+      providerName: 'OpenRouter'
+    };
+  }
+  if (groqKey) {
+    return {
+      client: new OpenAI({
+        apiKey: groqKey,
+        baseURL: 'https://api.groq.com/openai/v1',
+      }),
+      model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+      providerName: 'Groq'
+    };
+  }
+  throw new Error('No AI Provider (Groq or OpenRouter) configured in .env.local');
+}
+
+// STEP 1: Clear
+// ... (rest of main logic using getActiveAiClient)
 async function main() {
-  const { GoogleGenAI } = await import('@google/genai');
+  const { client, model, providerName } = getActiveAiClient();
 
-  let ai = new GoogleGenAI({ apiKey: GEMINI_KEYS[currentKeyIndex] });
-
-  // STEP 1: Clear
   console.log('\n🗑️  Borrando cursos existentes...');
   const { error: e1 } = await supa.from('courses').delete().gt('id', '00000000-0000-0000-0000-000000000000');
   if (e1) console.warn('⚠️  courses:', e1.message); else console.log('✓ Cursos eliminados');
@@ -178,8 +188,7 @@ async function main() {
   const { error: e2 } = await supa.from('engine_cycles').delete().gt('id', '00000000-0000-0000-0000-000000000000');
   if (e2) console.warn('⚠️  cycles:', e2.message); else console.log('✓ Ciclos eliminados');
 
-  // STEP 2: Create cycle
-  const cycleId = `cycle-${new Date().toISOString().split('T')[0]}-gemini-v1`;
+  const cycleId = `cycle-${new Date().toISOString().split('T')[0]}-reset-v1`;
   const { data: cycle, error: cycleErr } = await supa
     .from('engine_cycles')
     .insert({ cycle_id: cycleId, status: 'processing' })
@@ -187,9 +196,8 @@ async function main() {
     .single();
 
   if (cycleErr) { console.error('❌ Error ciclo:', cycleErr.message); process.exit(1); }
-  console.log(`\n🚀 Ciclo iniciado: ${cycleId}\n`);
+  console.log(`\n🚀 Ciclo iniciado: ${cycleId} (Usando ${providerName} con ${model})\n`);
 
-  // STEP 3: Generate
   const tiers = [
     'FREE', 'FREE',
     'PRO', 'PRO', 'PRO', 'PRO',
@@ -197,8 +205,6 @@ async function main() {
   ];
   const topics = pickTopics(tiers);
   let saved = 0, failed = 0;
-
-  // Keep track of day_number per tier
   const tierDayNumbers = { FREE: 1, PRO: 1, PREMIUM: 1 };
 
   for (let i = 0; i < tiers.length; i++) {
@@ -210,49 +216,24 @@ async function main() {
 
     const promptText = buildPrompt(tier, topic);
     let resultText = null;
-    let useGroq = false;
 
-    // Retry loop for Gemini keys
-    let attempt = 0;
-    while (!resultText && !useGroq && attempt < GEMINI_KEYS.length) {
-      try {
-        const response = await ai.models.generateContent({
-          model: GEMINI_MODEL,
-          contents: promptText,
-          config: {
-            systemInstruction: SYSTEM_IDENTITY,
-            responseMimeType: 'application/json',
-            temperature: 0.8
-          }
-        });
-        resultText = response.text;
-      } catch (err) {
-        if (err.status === 429 || err.message.includes('429')) {
-           console.warn(`  ⚠️  Rate limit con API key index ${currentKeyIndex}, rotando a la siguiente...`);
-           currentKeyIndex = (currentKeyIndex + 1) % GEMINI_KEYS.length;
-           ai = new GoogleGenAI({ apiKey: GEMINI_KEYS[currentKeyIndex] });
-           // Esperar un poco antes de volver a intentar
-           await new Promise(r => setTimeout(r, 2000));
-        } else {
-           console.error(`  ❌ Gemini error no-429: ${err.message}`);
-           useGroq = true; // Si es un error distinto a limit, fallamos hacia Groq de una vez
-        }
-      }
-      attempt++;
+    try {
+      const completion = await client.chat.completions.create({
+        model,
+        messages: [
+          { role: 'system', content: SYSTEM_IDENTITY },
+          { role: 'user', content: promptText }
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0.8
+      });
+      resultText = completion.choices[0].message?.content;
+    } catch (err) {
+      console.error(`  ❌ ${providerName} error: ${err.message}`);
     }
-
-    if (!resultText && GROQ_API_KEY) {
-        console.warn(`  🔀 Usando Groq como fallback...`);
-        try {
-            resultText = await performGroqFallback(promptText);
-        } catch (groqErr) {
-            console.error(`  ❌ Groq error: ${groqErr.message}`);
-        }
-    }
-
 
     if (!resultText) {
-        console.error('  ❌ Todos los métodos fallaron. Saltando.');
+        console.error('  ❌ Falló la generación. Saltando.');
         failed++;
         continue;
     }
@@ -284,15 +265,11 @@ async function main() {
       failed++;
     }
 
-    // Delay entre todos los calls
     if (i < tiers.length - 1) {
-      process.stdout.write(`  ⏱️  Esperando 4s...`);
-      await new Promise(r => setTimeout(r, 4000));
-      process.stdout.write(' listo\n');
+      await new Promise(r => setTimeout(r, 2000));
     }
   }
 
-  // STEP 4: Close cycle
   await supa.from('engine_cycles')
     .update({ status: failed === tiers.length ? 'failed' : 'completed', completed_at: new Date().toISOString() })
     .eq('id', cycle.id);
@@ -304,6 +281,11 @@ async function main() {
   console.log(`   Ciclo ID         : ${cycleId}`);
   console.log('═══════════════════════════════════════════\n');
 }
+
+main().catch(err => {
+  console.error('\n❌ Error fatal:', err.message);
+  process.exit(1);
+});
 
 main().catch(err => {
   console.error('\n❌ Error fatal:', err.message);

@@ -7,9 +7,13 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 const DB_PASS = 'V@llado212g';
 
 const SHARDS = {
+    CORE: { id: 'yqjwqhncofynnkezkuur', region: 'eu-west-1' },
     COURSES: { id: 'mxnwlsioxzoynekbiaxb', region: 'eu-central-2' },
-    AI_BRAIN: { id: 'vprlwusrkmbbjqytogyf', region: 'eu-central-2' },
-    LOGS: { id: 'gtxuuxsjaushzzinqvjw', region: 'eu-west-1' }
+    AI_BRAIN: { id: 'vprlwusrkmbbjqytogyf', region: 'eu-central-1' },
+    LOGS: { id: 'gtxuuxsjaushzzinqvjw', region: 'eu-west-1' },
+    MARKETING: { id: 'bvavomfudfolsxvgowjm', region: 'eu-central-1' },
+    NETWORKING: { id: 'ofmxiuxxeyxdxdpkmjld', region: 'eu-west-1' },
+    BUSINESS: { id: 'efdulqethvuzkajdikru', region: 'eu-west-1' }
 };
 
 const SSL_CONFIG = { rejectUnauthorized: false };
@@ -28,7 +32,18 @@ async function runSQLDirect(uri, sql) {
 }
 
 async function fixSchemas() {
-    console.log('--- Fixing Shard Schemas ---');
+    console.log('--- Fixing Shard Schemas (Total Expansion) ---');
+
+    const DB_PASS = 'V@llado212g';
+
+    // 0. CORE: Trial & IP logic
+    console.log('- Setting up CORE (yqjwqhncofynnkezkuur)...');
+    const coreUri = `postgresql://postgres.${SHARDS.CORE.id}:${DB_PASS}@aws-1-${SHARDS.CORE.region}.pooler.supabase.com:6543/postgres`;
+    const sqlCore = `
+        ALTER TABLE public.app_users ADD COLUMN IF NOT EXISTS trial_start_at TIMESTAMPTZ DEFAULT now();
+        ALTER TABLE public.app_users ADD COLUMN IF NOT EXISTS registration_ip TEXT;
+    `;
+    await runSQLDirect(coreUri, sqlCore);
 
     // 1. COURSES: needs tests
     console.log('- Setting up COURSES (mxnwlsioxzoynekbiaxb)...');
@@ -37,9 +52,9 @@ async function fixSchemas() {
         CREATE TABLE IF NOT EXISTS public.course_tests (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             course_id UUID NOT NULL REFERENCES public.courses(id) ON DELETE CASCADE,
-            questions JSONB NOT NULL DEFAULT '[]'::jsonb,
-            answers_visible BOOLEAN DEFAULT FALSE,
-            release_answers_at TIMESTAMPTZ NOT NULL,
+            questions JSONB NOT NULL DEFAULT '[]'::jsonb, -- [{question, options, correct}]
+            pass_percentage INTEGER DEFAULT 60,
+            unlock_price DECIMAL DEFAULT 2.50,
             created_at TIMESTAMPTZ DEFAULT now()
         );
         CREATE INDEX IF NOT EXISTS idx_course_tests_course_id ON public.course_tests(course_id);
@@ -83,16 +98,27 @@ async function fixSchemas() {
     `;
     await runSQLDirect(logsUri, sqlLogs);
 
-    // 3. AI_BRAIN: ensure recipes, ingredients, techniques are there
+    // 3. AI_BRAIN: Knowledge, Ingredients, Techniques, Recipes
     console.log('- Setting up AI_BRAIN (vprlwusrkmbbjqytogyf)...');
     const aiUri = `postgresql://postgres.${SHARDS.AI_BRAIN.id}:${DB_PASS}@aws-1-${SHARDS.AI_BRAIN.region}.pooler.supabase.com:6543/postgres`;
-    // Skip re-creation if already done by MASTER_GRANDCHEF.sql, but we can call it again
     const sqlAi = `
         CREATE TABLE IF NOT EXISTS public.ingredients (id TEXT PRIMARY KEY, name TEXT NOT NULL, category TEXT, family TEXT, description TEXT, pairing_notes JSONB, stories JSONB, created_at TIMESTAMPTZ DEFAULT now());
         CREATE TABLE IF NOT EXISTS public.techniques (id TEXT PRIMARY KEY, name TEXT NOT NULL, category TEXT, description TEXT, difficulty TEXT, equipment JSONB, reagents JSONB, pairing_notes JSONB, created_at TIMESTAMPTZ DEFAULT now());
         CREATE TABLE IF NOT EXISTS public.recipes (id TEXT PRIMARY KEY, title TEXT NOT NULL, source TEXT, tier TEXT, difficulty TEXT, servings INTEGER, times JSONB, description TEXT, utensils JSONB, ingredients JSONB, steps JSONB, techniques JSONB, tags JSONB, created_at TIMESTAMPTZ DEFAULT now());
     `;
     await runSQLDirect(aiUri, sqlAi);
+
+    // 4. NETWORKING: Job market, messaging, awards, company profiles
+    console.log('- Setting up NETWORKING (ofmxiuxxeyxdxdpkmjld)...');
+    const netUri = `postgresql://postgres.${SHARDS.NETWORKING.id}:${DB_PASS}@aws-1-${SHARDS.NETWORKING.region}.pooler.supabase.com:6543/postgres`;
+    const sqlNet = fs.readFileSync(path.join(__dirname, 'networking_schema.sql'), 'utf8');
+    await runSQLDirect(netUri, sqlNet);
+
+    // 5. BUSINESS: Invoices, Trends, Certificates
+    console.log('- Setting up BUSINESS (efdulqethvuzkajdikru)...');
+    const busUri = `postgresql://postgres.${SHARDS.BUSINESS.id}:${DB_PASS}@aws-1-${SHARDS.BUSINESS.region}.pooler.supabase.com:6543/postgres`;
+    const sqlBus = fs.readFileSync(path.join(__dirname, 'business_schema.sql'), 'utf8');
+    await runSQLDirect(busUri, sqlBus);
 
     console.log('--- SCHEMA FIX COMPLETE ---');
 }

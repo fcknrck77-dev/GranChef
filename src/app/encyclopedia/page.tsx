@@ -1,21 +1,42 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ingredients as localIngredients, Ingredient } from '@/data/ingredients';
-import { techniques as localTechniques, Technique } from '@/data/techniques';
+import { Loader2 } from 'lucide-react';
 import { ACCESS_CONFIGS } from '@/data/access';
 import Link from 'next/link';
-import { useUserAuth } from '@/context/UserAuthContext';
 import DetailModal from '@/components/DetailModal';
+import { useUserAuth } from '@/context/UserAuthContext';
 import { getSupabase } from '@/lib/supabaseClient';
+
+export interface Ingredient {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  pairingNotes: string[];
+  family: string;
+  stories?: Record<string, string>;
+}
+
+export interface Technique {
+  id: string;
+  name: string;
+  category: 'Texturizacion' | 'Termica' | 'Extraccion' | 'Presentacion';
+  description: string;
+  difficulty: 'Basico' | 'Intermedio' | 'Avanzado' | 'Maestro';
+  equipment: string[];
+  reagents?: string[];
+  pairingNotes: string[];
+}
 
 export default function Encyclopedia() {
   const { getEffectiveLevel, requireAuth } = useUserAuth();
   const [activeTab, setActiveTab] = useState<'ingredients' | 'techniques'>('ingredients');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedItem, setSelectedItem] = useState<Ingredient | Technique | null>(null);
-  const [ingredientsData, setIngredientsData] = useState<Ingredient[]>(localIngredients);
-  const [techniquesData, setTechniquesData] = useState<Technique[]>(localTechniques);
+  const [ingredientsData, setIngredientsData] = useState<Ingredient[]>([]);
+  const [techniquesData, setTechniquesData] = useState<Technique[]>([]);
+  const [loading, setLoading] = useState(true);
   
   const userLevel = getEffectiveLevel();
   const config = ACCESS_CONFIGS[userLevel];
@@ -30,7 +51,10 @@ export default function Encyclopedia() {
 
   useEffect(() => {
     const supabase = getSupabase('AI_BRAIN');
-    if (!supabase) return;
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
 
     (async () => {
       try {
@@ -39,18 +63,16 @@ export default function Encyclopedia() {
             .from('ingredients')
             .select('*')
             .order('family', { ascending: true })
-            .order('name', { ascending: true })
-            .limit(200),
+            .order('name', { ascending: true }),
           supabase
             .from('techniques')
             .select('*')
             .order('category', { ascending: true })
             .order('name', { ascending: true })
-            .limit(200)
         ]);
 
-        if (!ingRes.error && ingRes.data && ingRes.data.length > 0) {
-          const mapped = ingRes.data.map((r: any) => ({
+        if (ingRes.data) {
+          setIngredientsData(ingRes.data.map((r: any) => ({
             id: String(r.id),
             name: String(r.name),
             category: String(r.category),
@@ -58,12 +80,11 @@ export default function Encyclopedia() {
             description: String(r.description),
             pairingNotes: Array.isArray(r.pairing_notes) ? r.pairing_notes.map(String) : [],
             stories: r.stories && typeof r.stories === 'object' ? r.stories : undefined
-          }));
-          setIngredientsData(mapped);
+          })));
         }
 
-        if (!techRes.error && techRes.data && techRes.data.length > 0) {
-          const mapped = techRes.data.map((r: any) => ({
+        if (techRes.data) {
+          setTechniquesData(techRes.data.map((r: any) => ({
             id: String(r.id),
             name: String(r.name),
             category: String(r.category) as any,
@@ -72,11 +93,10 @@ export default function Encyclopedia() {
             equipment: Array.isArray(r.equipment) ? r.equipment.map(String) : [],
             reagents: Array.isArray(r.reagents) ? r.reagents.map(String) : [],
             pairingNotes: Array.isArray(r.pairing_notes) ? r.pairing_notes.map(String) : []
-          }));
-          setTechniquesData(mapped);
+          })));
         }
-      } catch {
-        // Keep local fallback
+      } finally {
+        setLoading(false);
       }
     })();
   }, []);
@@ -117,6 +137,7 @@ export default function Encyclopedia() {
       <header className="library-header">
         <div className="user-tier-badge">{userLevel === 'ADMIN' ? 'FULL MASTER ACCESS' : `${userLevel} ACCESS`}</div>
         <h1 className="neon-text">Omniscience Library</h1>
+        {loading && <div className="flex-center py-20"><Loader2 className="animate-spin text-primary" /></div>}
         <p className="description">
           Sinergias moleculares y protocolos de vanguardia. 
           {userLevel === 'FREE' && ' Actualiza a PRO para desbloquear el archivo completo.'}

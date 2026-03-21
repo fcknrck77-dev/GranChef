@@ -1,15 +1,8 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-
-let client: SupabaseClient | null = null;
+import { getSupabase } from '@/lib/supabaseClient';
+import { type SupabaseClient } from '@supabase/supabase-js';
 
 export default function getCoreClient(): SupabaseClient {
-  if (client) return client;
-  client = createClient(
-    (process.env.SUPABASE_CORE_URL || 'https://yqjwqhncofynnkezkuur.supabase.co'),
-    (process.env.SUPABASE_CORE_SERVICE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy'),
-    {
-      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
-    }
-  );
+  const client = getSupabase('CORE');
+  if (!client) throw new Error('Supabase CORE client not configured');
   return client;
 }

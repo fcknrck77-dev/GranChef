@@ -1,126 +1,110 @@
-import { GoogleGenAI } from '@google/genai';
+import OpenAI from 'openai';
 import getAiClient from './supabase/ai';
 import getLogsClient from './supabase/logs';
+import { getSupabase } from './supabaseClient';
+import { 
+  SYSTEM_IDENTITY, 
+  buildIngredientPrompt, 
+  buildTechniquePrompt, 
+  buildRecipePrompt,
+  buildCoursePrompt 
+} from './culinary_prompts';
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  SYSTEM IDENTITY - THE REDACTOR MAESTRO (Shared for all content)
-// ─────────────────────────────────────────────────────────────────────────────
-const SYSTEM_IDENTITY = `
-Eres el RedactorMaestro de GrandChef Lab: una inteligencia editorial gastronómica autónoma de nivel internacional.
-
-Tu función es generar contenido culinario (Ingredientes, Técnicas, Recetas) de la más alta precisión técnica, 
-originalidad absoluta y profundidad gastronómica. No repites frases, no usas relleno y tratas cada entrada 
-como una pieza de una enciclopedia de elite (tipo Modernist Cuisine o manuales de la CIA).
-
-Reglas Editoriales:
-1. Densidad técnica: Explica la ciencia detrás de cada ingrediente o técnica.
-2. Narrativa pro: No listas de supermercado. Los ingredientes se describen por su comportamiento molecular y organoléptico.
-3. Sin redundancia: Si una idea ya se explicó, no vuelvas a ella.
-4. Idioma: Español profesional/gastronómico de España o estándar internacional neutro de alto nivel.
-`.trim();
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  PROMPTS GENERATION
+//  AI CLIENT CONFIGURATION
 // ─────────────────────────────────────────────────────────────────────────────
 
-function buildIngredientPrompt(instruction: string): string {
+function getAiProvider(preference: 'OpenRouter' | 'Groq' = 'OpenRouter') {
+  const orKey = process.env.OPENROUTER_API_KEY;
+  const groqKeys = [process.env.GROQ_API_KEY, process.env.GROQ_API_KEY_2].filter(Boolean);
+
+  if (preference === 'OpenRouter' && orKey) {
+    return {
+      client: new OpenAI({
+        apiKey: orKey,
+        baseURL: 'https://openrouter.ai/api/v1',
+        defaultHeaders: {
+          'HTTP-Referer': 'https://grandchefapp.online',
+          'X-Title': 'GrandChef Lab',
+        }
+      }),
+      model: process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct',
+      provider: 'OpenRouter'
+    };
+  }
+
+  if (groqKeys.length > 0) {
+    // Basic rotation or pick first available (for now we loop in the failover loop)
+    const key = groqKeys[0]; 
+    return {
+      client: new OpenAI({
+        apiKey: key as string,
+        baseURL: 'https://api.groq.com/openai/v1',
+      }),
+      model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+      provider: 'Groq'
+    };
+  }
+
+  throw new Error('No AI Provider (OpenRouter/Groq) available');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  KNOWLEDGE RETRIEVAL
+// ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+//  KNOWLEDGE RETRIEVAL
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function getCulinaryKnowledge(topic: string) {
+  const supaAiBrain = getAiClient();
+  if (!supaAiBrain) return "";
+  
+  try {
+    const { data, error } = await supaAiBrain
+      .from('culinary_knowledge')
+      .select('pair_key, body')
+      .textSearch('fts', topic, {
+        config: 'spanish'
+      })
+      .limit(3);
+
+    if (error || !data || data.length === 0) return "";
+    
+    return data.map(k => `--- CONOCIMIENTO EXTRACTADO (${k.pair_key}) ---\n${k.body}`).join('\n\n');
+  } catch (err) {
+    console.error('[AI KNOWLEDGE] Error fetching knowledge:', err);
+    return "";
+  }
+}
+
+function buildTestPrompt(courseTitle: string, tier: string, courseContent: string): string {
+  const count = tier === 'FREE' ? 10 : (tier === 'PRO' ? 25 : 50);
   return `
-ORDEN: Generar un Ingrediente técnico basado en: "${instruction}"
+ORDEN: Generar un Examen de evaluation para el curso: "${courseTitle}"
+NIVEL: ${tier} (${count} preguntas obligatorias).
 
 REQUISITOS DEL OBJETO JSON:
-1. id: String minúsculas, sin espacios (ej: 'ajo_negro').
-2. name: Nombre profesional.
-3. category: Categoría culinaria (Vegetal, Proteína, Hidrocoloide, etc).
-4. family: Familia biológica o técnica.
-5. description: Mínimo 250 palabras de descripción técnica, científica e histórica profunda.
-6. pairing_notes: Array de strings con otros ingredientes compatibles.
-7. stories: Objeto JSON donde las llaves son nombres de ingredientes y los valores son breves "historias" o sinergias culinarias (mínimo 3).
+1. questions: Array de exactamente ${count} objetos. Cada objeto:
+   - question: Texto de la pregunta técnica.
+   - options: Array de 4 opciones (strings).
+   - correct: Índice de la opción correcta (0-3).
+
+IMPORTANTE:
+- Las preguntas deben ser extremadamente profesionales y alineadas con el contenido: ${courseContent.slice(0, 500)}...
+- Sin respuestas obvias. Nivel experto.
 
 DEVUELVE SOLO EL JSON:
 {
-  "id": "...",
-  "name": "...",
-  "category": "...",
-  "family": "...",
-  "description": "...",
-  "pairing_notes": ["...", "..."],
-  "stories": { "Ingrediente X": "Sinergia técnica..." }
-}
-`.trim();
-}
-
-function buildTechniquePrompt(instruction: string): string {
-  return `
-ORDEN: Generar una Técnica culinaria basada en: "${instruction}"
-
-REQUISITOS DEL OBJETO JSON:
-1. id: String minúsculas (ej: 'esferificacion_inversa').
-2. name: Nombre formal.
-3. category: Basado en (Térmica, Texturización, Fermentación, etc).
-4. description: Mínimo 400 palabras explicando el proceso, la ciencia, los puntos de control y las fallas comunes.
-5. difficulty: Uno de ('Basico', 'Intermedio', 'Avanzado', 'Maestro').
-6. equipment: Array de herramientas necesarias.
-7. reagents: Array de químicos o reactivos si aplica (ej: Alginato).
-8. pairing_notes: Aplicaciones recomendadas (ej: "Salsas ácidas", "Frutas").
-
-DEVUELVE SOLO EL JSON:
-{
-  "id": "...",
-  "name": "...",
-  "category": "...",
-  "description": "...",
-  "difficulty": "...",
-  "equipment": ["...", "..."],
-  "reagents": ["...", "..."],
-  "pairing_notes": ["...", "..."]
-}
-`.trim();
-}
-
-function buildRecipePrompt(instruction: string): string {
-  return `
-ORDEN: Generar una Receta de alta cocina basada en: "${instruction}"
-
-REQUISITOS DEL OBJETO JSON:
-1. id: String minúsculas (ej: 'bacalao_confitado_citricos').
-2. title: Título sugerente y profesional.
-3. source: Siempre "Grand Chef".
-4. tier: Uno de ('FREE', 'PRO', 'PREMIUM').
-5. difficulty: Uno de ('Basico', 'Intermedio', 'Avanzado', 'Maestro').
-6. servings: Número entero realista.
-7. times: Objeto { prepMin: number, cookMin: number, restMin?: number } (minutos).
-8. description: Narrativa de armonía del plato (mínimo 150 palabras).
-9. utensils: Array de utensilios (mínimo 5 si aplica).
-10. ingredients: Array de objetos { name: string, amount: number, unit: 'g'|'ml'|'ud'|'cda'|'cdta', notes?: string }.
-11. steps: Array de strings (mínimo 12 pasos, muy detallados, con controles, señales visuales, temperaturas cuando aplique, y puntos críticos).
-12. techniques: Array de IDs de técnicas relacionadas (strings).
-13. tags: Array de etiquetas útiles (strings).
-
-REGLAS ABSOLUTAS:
-- No menciones IA/AI, modelos, prompts, herramientas ni "como asistente".
-- No uses texto fuera del JSON.
-
-DEVUELVE SOLO EL JSON:
-{
-  "id": "...",
-  "title": "...",
-  "source": "Grand Chef",
-  "tier": "...",
-  "difficulty": "...",
-  "servings": 2,
-  "times": { "prepMin": 10, "cookMin": 10, "restMin": 0 },
-  "description": "...",
-  "utensils": ["..."],
-  "ingredients": [{ "name": "...", "amount": 100, "unit": "g", "notes": "" }],
-  "steps": ["...", "..."],
-  "techniques": ["...", "..."],
-  "tags": ["..."]
+  "questions": [
+    { "question": "...", "options": ["...", "...", "...", "..."], "correct": 0 }
+  ]
 }
 `.trim();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  AI SERVICE LOGIC (GEMINI)
+//  AI SERVICE LOGIC (MULTI-PROVIDER WITH FAILOVER)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function fulfillAiRequest(requestId: string) {
@@ -135,45 +119,83 @@ export async function fulfillAiRequest(requestId: string) {
     .eq('id', requestId)
     .single();
 
-  if (fetchErr || !request) throw new Error('Request not found in LOGS shard');
+  if (fetchErr || !request) throw new Error('Request not found');
 
   await supaLogs.from('ai_requests').update({ status: 'processing' }).eq('id', requestId);
 
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-pro';
-
     let userPrompt = '';
     let targetTable = '';
+    const knowledge = await getCulinaryKnowledge(request.instruction);
 
     if (request.kind === 'ingredients') {
-      userPrompt = buildIngredientPrompt(request.instruction);
+      userPrompt = buildIngredientPrompt(request.instruction, knowledge);
       targetTable = 'ingredients';
     } else if (request.kind === 'techniques') {
       userPrompt = buildTechniquePrompt(request.instruction);
       targetTable = 'techniques';
     } else if (request.kind === 'recipes') {
-      userPrompt = buildRecipePrompt(request.instruction);
+      userPrompt = buildRecipePrompt(request.instruction, knowledge);
       targetTable = 'recipes';
+    } else if (request.kind === 'courses') {
+      userPrompt = buildCoursePrompt((request.payload?.tier || 'FREE') as any, request.instruction, knowledge);
+      targetTable = 'courses';
+    } else if (request.kind === 'course_tests') {
+      const { courseTitle, tier, courseContent } = request.payload || {};
+      userPrompt = buildTestPrompt(courseTitle || 'Curso', tier || 'FREE', courseContent || '');
+      targetTable = 'course_tests';
     } else {
       throw new Error(`Unsupported kind: ${request.kind}`);
     }
 
-    const response = await ai.models.generateContent({
-      model: modelName,
-      contents: userPrompt,
-      config: {
-        systemInstruction: SYSTEM_IDENTITY,
-        responseMimeType: 'application/json',
-        temperature: 0.7
+    let completion;
+    let usedProvider = '';
+
+    const attemptConfigs: { name: string, key: string, base: string, model: string }[] = [];
+    if (process.env.OPENROUTER_API_KEY) {
+      attemptConfigs.push({ name: 'OpenRouter', key: process.env.OPENROUTER_API_KEY, base: 'https://openrouter.ai/api/v1', model: process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct' });
+    }
+    if (process.env.GROQ_API_KEY) {
+      attemptConfigs.push({ name: 'Groq-1', key: process.env.GROQ_API_KEY, base: 'https://api.groq.com/openai/v1', model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile' });
+    }
+    if (process.env.GROQ_API_KEY_2) {
+      attemptConfigs.push({ name: 'Groq-2', key: process.env.GROQ_API_KEY_2, base: 'https://api.groq.com/openai/v1', model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile' });
+    }
+
+    let success = false;
+    for (const conf of attemptConfigs) {
+      try {
+        console.log(`[AI SERVICE] Attempting with ${conf.name}...`);
+        const client = new OpenAI({
+          apiKey: conf.key,
+          baseURL: conf.base,
+          defaultHeaders: conf.name === 'OpenRouter' ? { 'HTTP-Referer': 'https://grandchefapp.online', 'X-Title': 'GrandChef Lab' } : {}
+        });
+
+        completion = await client.chat.completions.create({
+          model: conf.model,
+          messages: [{ role: 'system', content: SYSTEM_IDENTITY }, { role: 'user', content: userPrompt }],
+          response_format: { type: 'json_object' },
+          temperature: 0.7
+        });
+        usedProvider = conf.name;
+        success = true;
+        break;
+      } catch (err) {
+        console.warn(`[AI SERVICE] ${conf.name} failed: ${(err as any).message}`);
       }
-    });
+    }
 
-    const resultText = response.text;
-    const resultJson = JSON.parse(resultText || '{}');
+    if (!success || !completion) throw new Error('All AI providers (OpenRouter/Groq-1/Groq-2) failed.');
 
-    // Insert into final table (normalize to DB schema) in AI_BRAIN shard
+    const resultText = completion.choices[0].message?.content || '{}';
+    const resultJson = JSON.parse(resultText);
+    console.log(`[AI SERVICE] Success using ${usedProvider}`);
+
+    // Insert into final table (normalize to DB schema)
     let rowToInsert: any = resultJson;
+    let finalShard = supaAiBrain; // Default
+
     if (request.kind === 'recipes') {
       rowToInsert = {
         id: String(resultJson.id || '').trim(),
@@ -190,12 +212,32 @@ export async function fulfillAiRequest(requestId: string) {
         techniques: Array.isArray(resultJson.techniques) ? resultJson.techniques : [],
         tags: Array.isArray(resultJson.tags) ? resultJson.tags : [],
       };
-      if (!rowToInsert.id || !rowToInsert.title || !rowToInsert.tier) {
-        throw new Error('Invalid recipe output: missing id/title/tier');
-      }
+    } else if (request.kind === 'courses') {
+      const coursesShard = getSupabase('COURSES');
+      if (coursesShard) finalShard = coursesShard;
+      rowToInsert = {
+        id: resultJson.id,
+        title: resultJson.title,
+        description: resultJson.description,
+        instructor: resultJson.instructor || 'Grand Chef',
+        category: resultJson.category || 'Técnicas',
+        tier: resultJson.tier || 'FREE',
+        days_required: resultJson.days_required || 1,
+        reading_time: resultJson.reading_time || '',
+        modules: resultJson.modules || []
+      };
+    } else if (request.kind === 'course_tests') {
+      const coursesShard = getSupabase('COURSES');
+      if (coursesShard) finalShard = coursesShard;
+      rowToInsert = {
+        course_id: request.payload?.course_id,
+        questions: resultJson.questions,
+        pass_percentage: 60,
+        unlock_price: 2.50
+      };
     }
 
-    const { error: insertErr } = await supaAiBrain.from(targetTable).upsert(rowToInsert, { onConflict: 'id' });
+    const { error: insertErr } = await (finalShard as any).from(targetTable).upsert(rowToInsert, { onConflict: request.kind === 'course_tests' ? undefined : 'id' });
     if (insertErr) throw insertErr;
 
     // Update request in LOGS shard
@@ -204,7 +246,7 @@ export async function fulfillAiRequest(requestId: string) {
       payload: resultJson 
     }).eq('id', requestId);
 
-    console.log(`[AI SERVICE] ✓ Fulfilled ${request.kind} request in AI_BRAIN shard: ${resultJson.name || resultJson.title}`);
+    console.log(`[AI SERVICE] ✓ Fulfilled ${request.kind} request: ${resultJson.name || resultJson.title || 'Exam'}`);
     return { ok: true, data: resultJson };
 
   } catch (err: any) {

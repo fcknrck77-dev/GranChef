@@ -19,6 +19,7 @@ jobs:
       - name: Run cron tasks
         env:
           CRON_BASE_URL: ${{ secrets.CRON_BASE_URL }}
+          NEXT_PUBLIC_BASE_URL: ${{ secrets.NEXT_PUBLIC_BASE_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           CRON_AI_LIMIT: "10"
         run: npm run cron:run

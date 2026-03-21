@@ -42,6 +42,14 @@ export default function Navbar() {
           <li><Link href={appHref('/courses')} onClick={closeMenu}>Courses</Link></li>
           {isAdmin && <li><Link href={appHref('/admin')} className="admin-quick-link" onClick={closeMenu}>⚡ ADMIN</Link></li>}
           <li><Link href="/pricing" style={{ color: 'var(--accent)' }} onClick={closeMenu}>Pro</Link></li>
+          
+          {authState.isRegistered && (userLevel === 'PRO' || userLevel === 'PREMIUM' || isAdmin) && (
+            <>
+              <li><Link href="/business/escandallos" onClick={closeMenu}>Escandallos</Link></li>
+              <li><Link href="/business/fichas" onClick={closeMenu}>Fichas</Link></li>
+            </>
+          )}
+
           <li>
             {!authState.isRegistered ? (
               IS_LANDING ? (
@@ -54,9 +62,14 @@ export default function Navbar() {
                 </button>
               )
             ) : (
-              <Link href={appHref(isAdmin ? "/admin" : "/profile")} className="chef-link" onClick={closeMenu}>
-                <span className="user-badge">{userLevel}</span> {isAdmin ? 'ADMIN MI CUENTA' : (authState.profile?.firstName || 'MI CUENTA')}
-              </Link>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Link href={appHref(isAdmin ? "/admin" : "/social/perfil")} className="chef-link" onClick={closeMenu}>
+                  <span className="user-badge">{userLevel}</span> {isAdmin ? 'ADMIN' : (authState.profile?.firstName || 'MI CUENTA')}
+                </Link>
+                <button onClick={() => { useUserAuth().logout(); closeMenu(); }} className="logout-btn">
+                  SALIR
+                </button>
+              </div>
             )}
           </li>
           <li><ThemeToggle /></li>
@@ -94,6 +107,21 @@ export default function Navbar() {
           margin-right: 5px;
           color: var(--primary);
           border: 1px solid var(--primary);
+        }
+        .logout-btn {
+          background: rgba(255,50,50,0.1);
+          color: #ff5555;
+          border: 1px solid rgba(255,50,50,0.2);
+          padding: 6px 14px;
+          border-radius: 12px;
+          font-size: 0.7rem;
+          font-weight: 800;
+          cursor: pointer;
+          transition: 0.2s;
+        }
+        .logout-btn:hover {
+          background: #ff5555;
+          color: white;
         }
 
         :global(.nav-links) {

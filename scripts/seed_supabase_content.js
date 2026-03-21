@@ -15,7 +15,7 @@ function loadDotEnvLocal() {
     const idx = trimmed.indexOf('=');
     if (idx === -1) continue;
     const key = trimmed.slice(0, idx).trim();
-    const val = trimmed.slice(idx + 1).trim();
+    const val = trimmed.slice(idx + 1).trim().replace(/^["']|["']$/g, '');
     if (!(key in process.env)) process.env[key] = val;
   }
 }
@@ -61,7 +61,7 @@ function buildIngredients() {
   const base = ['Cítrico', 'Herbal', 'Especiado', 'Umami', 'Tostado', 'Floral', 'Ahumado', 'Lácteo'];
   const forms = ['Polvo de', 'Extracto de', 'Gel de', 'Aire de', 'Infusion de', 'Reduccion de'];
   let k = 1;
-  while (raw.length < 100) {
+  while (raw.length < 200) {
     const fam = groups[k % groups.length].family;
     const cat = groups[k % groups.length].category;
     const form = forms[k % forms.length];
@@ -75,7 +75,7 @@ function buildIngredients() {
     k++;
   }
 
-  const trimmed = raw.slice(0, 100);
+  const trimmed = raw.slice(0, 200);
   const names = trimmed.map((x) => x.name);
 
   return trimmed.map((x, idx) => {
@@ -105,8 +105,7 @@ function buildIngredients() {
 }
 
 function buildTechniques() {
-  // 30 total
-  const list = [
+  const baseList = [
     { name: 'Esferificación inversa', category: 'Texturización', difficulty: 'Avanzado' },
     { name: 'Aires y espumas', category: 'Texturización', difficulty: 'Básico' },
     { name: 'Gelificación con agar-agar', category: 'Texturización', difficulty: 'Básico' },
@@ -139,6 +138,19 @@ function buildTechniques() {
     { name: 'Aireado mecánico', category: 'Texturización', difficulty: 'Intermedio' }
   ];
 
+  const list = [...baseList];
+  const modifiers = [' de precisión', ' al vacío', ' en frío', ' acelerada', ' enzimática', ' molecular'];
+  let i = 0;
+  while (list.length < 50) {
+    const baseObj = baseList[i % baseList.length];
+    const mod = modifiers[i % modifiers.length];
+    list.push({
+      ...baseObj,
+      name: `${baseObj.name}${mod} ${i}`
+    });
+    i++;
+  }
+
   const equipmentByCategory = {
     'Texturización': ['Báscula de precisión', 'Batidora de inmersión', 'Colador fino'],
     'Térmica': ['Ronner', 'Termómetro', 'Bolsas al vacío'],
@@ -168,7 +180,7 @@ function buildTechniques() {
     category: t.category,
     description: `Protocolo ${t.difficulty.toLowerCase()} para ${t.name}. Enfoque en repetibilidad y control.`,
     difficulty: t.difficulty,
-    equipment: equipmentByCategory[t.category] || ['Utillaje basico'],
+    equipment: equipmentByCategory[t.category] || ['Utillaje base'],
     reagents: reagentsByName(t.name),
     pairing_notes: pairingByCategory(t.category)
   }));
@@ -200,12 +212,12 @@ function buildParagraphBank() {
 
   if (bank.length < 200) {
     bank.push(
-      'Control de servicio: cada pase debe salir con la misma temperatura, textura y brillo. Registra el peso final del plato, la temperatura en el centro y el tiempo que pasa en caliente. Si varía, corrige el orden de montaje.',
-      'Estandariza el mise en place con bandejas etiquetadas, filmadas y con fecha. Usa rotación FIFO y pesa cada subreceta. Un mise en place ordenado reduce fallos y acelera el pase.',
-      'Define un vocabulario sensorial común: ataque (primer aroma), centro (gusto dominante), final (persistencia), textura (boca) y temperatura percibida. Evalúa con ese orden.',
+      'Control de servicio: cada pase debe salir con la misma temperatura, textura y brillo. Registra el peso final del plato, la temperatura en el centro y el tiempo que pasa en caliente.',
+      'Estandariza el mise en place con bandejas etiquetadas, filmadas y con fecha. Usa rotación FIFO y pesa cada subreceta.',
+      'Define un vocabulario sensorial común: ataque (primer aroma), centro (gusto dominante), final (persistencia), textura (boca) y temperatura.',
       'Cada iteración de prueba debe registrar lote, hora, operador, equipos usados, calibración y observaciones de control. Sin datos no hay mejora.',
       'Aplica ingeniería de menús: calcula escandallo, margen y tiempo de pase. Un plato excelente debe ser rentable y ejecutable en hora pico.',
-      'Cuando una técnica falle, etiqueta el fallo (corte, sobrecocción, falta de gel, exceso de agua, textura arenosa) y vincúlalo a una causa física. Repite con un solo cambio.'
+      'Cuando una técnica falle, etiqueta el fallo (corte, sobrecocción, falta de gel) y vincúlalo a una causa física.'
     );
   }
 
@@ -213,7 +225,7 @@ function buildParagraphBank() {
 }
 
 async function buildCourses() {
-  const limits = { FREE: 2, PRO: 4, PREMIUM: 8 };
+  const limits = { FREE: 5, PRO: 10, PREMIUM: 15 };
   const produced = { FREE: 0, PRO: 0, PREMIUM: 0 };
 
   const paragraphBank = buildParagraphBank();
@@ -284,13 +296,22 @@ async function buildCourses() {
   const topicsByTier = {
     FREE: [
       'Cuchillos y cortes de precisión para servicio rápido',
-      'Fondos vegetales ultra claros y sazón exacta'
+      'Fondos vegetales ultra claros y sazón exacta',
+      'Marinadas base y emulsiones en frío',
+      'Organización de partida y limpieza activa',
+      'Tipos de cocción básica y escaldado perfecto'
     ],
     PRO: [
       'Asado inverso y reposo controlado en carnes rojas',
       'Fermentación de frutas para cocina salada',
       'Pastelería de pase caliente con mise en place isotérmica',
-      'Robata y brasa japonesa aplicada a pescados grasos'
+      'Robata y brasa japonesa aplicada a pescados grasos',
+      'Texturas con hidrocoloides: agar y gellan',
+      'Esferificación básica y control de pH',
+      'Fondos oscuros de alta reducción y colágeno',
+      'Curados en sal y azúcar para pescados',
+      'Cocción al vacío (sous-vide) de vegetales de raíz',
+      'Control de mermas y escandallos avanzados'
     ],
     PREMIUM: [
       'Narrativa gastronómica y arquitectura de menú degustación',
@@ -300,7 +321,14 @@ async function buildCourses() {
       'Fermentos complejos y misos express de precisión',
       'Ingeniería de prebatch y logística de regeneración premium',
       'Auditoría sensorial, trazabilidad y consistencia de marca',
-      'Postres de restaurante con control de agua y cristales'
+      'Postres de restaurante con control de agua y cristales',
+      'Koji y aplicaciones en maduración prolongada de carnes',
+      'Técnicas de extracción por ultrasonidos y liofilización',
+      'Ahumados en frío y maderas seleccionadas para maridaje',
+      'Cocina criogénica con nitrógeno líquido seguro',
+      'Neurogastronomía y diseño de experiencias en sala',
+      'Equilibrio de grasas y acidez en menús de 20 pases',
+      'Desarrollo de concepto y pitch para inversores culinarios'
     ]
   };
 
@@ -326,30 +354,74 @@ async function buildCourses() {
       `Entrega solo el texto final con las cuatro secciones en párrafos continuos.`
     ].join('\n');
 
-    const geminiApiKey = process.env.GEMINI_API_KEY;
-    if (!geminiApiKey) throw new Error('Falta GEMINI_API_KEY en .env.local');
+    const orKey = process.env.OPENROUTER_API_KEY;
+    const groqKey1 = process.env.GROQ_API_KEY;
+    const groqKey2 = process.env.GROQ_API_KEY_2;
+    
+    const getAiConfigs = () => {
+      const configs = [];
+      if (orKey) {
+        configs.push({
+          apiKey: orKey,
+          baseURL: 'https://openrouter.ai/api/v1',
+          headers: { 'HTTP-Referer': 'https://grandchefapp.online', 'X-Title': 'GrandChef Seeder' },
+          model: process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct',
+          name: 'OpenRouter'
+        });
+      }
+      if (groqKey1) {
+        configs.push({
+          apiKey: groqKey1,
+          baseURL: 'https://api.groq.com/openai/v1',
+          model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+          name: 'Groq-1'
+        });
+      }
+      if (groqKey2) {
+        configs.push({
+          apiKey: groqKey2,
+          baseURL: 'https://api.groq.com/openai/v1',
+          model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+          name: 'Groq-2'
+        });
+      }
+      return configs;
+    };
+
+    const aiConfigs = getAiConfigs();
+    if (aiConfigs.length === 0) throw new Error('No AI Provider (OpenRouter/Groq) configured in .env.local');
 
     let content = null;
+    let success = false;
 
-    try {
-      const { GoogleGenAI } = await import('@google/genai');
-      const ai = new GoogleGenAI({ apiKey: geminiApiKey });
-      const model = process.env.GEMINI_MODEL || 'gemini-2.5-pro';
+    for (const config of aiConfigs) {
+      try {
+        console.log(`[buildContinuousContent] Attempting with ${config.name} (${config.model}) for ${tier}...`);
+        const client = new OpenAI({
+          apiKey: config.apiKey,
+          baseURL: config.baseURL,
+          defaultHeaders: config.headers || {}
+        });
 
-      const response = await ai.models.generateContent({
-        model,
-        contents: prompt,
-        config: {
-          systemInstruction: 'Eres el RedactorMaestro de GrandChef Lab: redacción editorial gastronómica de nivel internacional, precisión técnica y estilo de escuela culinaria.',
+        const completion = await client.chat.completions.create({
+          model: config.model,
+          messages: [
+            { role: 'system', content: 'Eres el RedactorMaestro de GrandChef Lab: redacción editorial gastronómica de nivel internacional, precisión técnica y estilo de escuela culinaria.' },
+            { role: 'user', content: prompt }
+          ],
           temperature: 0.7
+        });
+        content = completion.choices[0].message?.content;
+        if (content) {
+          success = true;
+          break;
         }
-      });
-      content = response.text;
-    } catch (e) {
-      throw new Error(`Gemini error: ${e.message}`);
+      } catch (e) {
+        console.warn(`[buildContinuousContent] ${config.name} failed: ${e.message}`);
+      }
     }
 
-    if (!content) throw new Error('Generación fallida: sin respuesta de Gemini');
+    if (!success || !content) throw new Error('Generación fallida: todos los proveedores de AI fallaron.');
     return { content, generationCycleId };
   };
 
@@ -445,85 +517,115 @@ async function upsertAll(client, table, rows, options) {
   return done;
 }
 
-function buildTestsForCourse(course) {
+function buildTestsForCourse(course, cid) {
   const text = (course.modules?.[0]?.content || '').replace(/\s+/g, ' ').trim();
   const sentences = text.split(/(?<=[.!?])\s+/).filter((s) => s.length > 20);
-  const pick = (i) => sentences[i % sentences.length] || course.title;
+  const pick = (i) => sentences[i % sentences.length] || course.title || 'Tema introductorio';
 
   const questions = [];
-  for (let i = 0; i < 20; i++) {
-    const stem = pick(i);
-    const correct = `Según el curso, ${stem}`;
+  for (let i = 0; i < 5; i++) {
+    const stem = pick(i) || 'Concepto base relativo al módulo';
+    const correct = `Según el curso, ${stem.slice(0, 50)}`;
     const distractors = [
       'Implica ignorar el control de temperatura y sal.',
       'Consiste en servir sin prueba de pase ni escandallo.',
       'Se basa en usar ingredientes al azar sin trazabilidad.'
     ];
     questions.push({
-      course_id: null, // filled later
-      question: `P${i + 1}: ${course.title} — ${stem.slice(0, 140)}`,
+      question: `P${i + 1}: ${course.title} — ${stem.slice(0, 140)}...`,
       options: [correct, ...distractors],
-      correct_index: 0,
-      answers_visible: false,
-      release_answers_at: new Date(Date.now() + 96 * 3600 * 1000).toISOString()
+      correct_index: 0
     });
   }
-  return questions;
+  
+  return {
+    course_id: cid,
+    questions: questions,
+    pass_percentage: 60,
+    unlock_price: 2.50,
+    release_answers_at: new Date(Date.now() + 96 * 3600 * 1000).toISOString()
+  };
 }
 
 async function main() {
   loadDotEnvLocal();
-  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  
+  const getSupa = (urlVar, keyVar) => {
+    const url = process.env[urlVar] || process.env[`NEXT_PUBLIC_${urlVar}`];
+    const key = process.env[keyVar] || process.env[`NEXT_PUBLIC_${keyVar}`] || process.env.SUPABASE_SERVICE_ROLE_KEY;
+    console.log(`[getSupa] ${urlVar}: url=[${url ? url.slice(0, 30) : 'null'}] key=[${key ? key.slice(0, 20) : 'null'}]`);
+    if (!url || !key) return null;
+    try {
+      return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+    } catch (e) {
+      console.error(`[getSupa] Failed to create client for ${urlVar}:`, e.message);
+      return null;
+    }
+  }
 
-  if (!url) throw new Error('Missing SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL in .env.local');
-  if (!service) throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY in .env.local');
+  const coreSupa = getSupa('SUPABASE_CORE_URL', 'SUPABASE_CORE_SERVICE_KEY') || getSupa('SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY');
+  const coursesSupa = getSupa('SUPABASE_COURSES_URL', 'SUPABASE_COURSES_SERVICE_KEY') || coreSupa;
+  const aiSupa = getSupa('SUPABASE_AI_URL', 'SUPABASE_AI_SERVICE_KEY') || getSupa('SUPABASE_AI_BRAIN_URL', 'SUPABASE_AI_BRAIN_SERVICE_KEY') || coreSupa;
 
-  const admin = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
+  if (!coreSupa) throw new Error('No se pudo inicializar el cliente Supabase CORE.');
 
   const ingredients = buildIngredients();
   const techniques = buildTechniques();
-  const courses = await buildCourses();
-
-  console.log(`Seeding ingredients=${ingredients.length}, techniques=${techniques.length}, courses=${courses.length}...`);
-
-  await upsertAll(admin, 'ingredients', ingredients, { onConflict: 'id' });
-  console.log('Seed ingredients: OK');
-
-  await upsertAll(admin, 'techniques', techniques, { onConflict: 'id' });
-  console.log('Seed techniques: OK');
-
-  await admin.from('courses').delete().neq('tier', '');
-  await upsertAll(admin, 'courses', courses, { onConflict: 'tier,days_required' });
-  console.log('Seed courses: OK');
-
-  // Attach generated IDs to courses
-  const { data: storedCourses, error: fetchErr } = await admin.from('courses').select('id,title').order('created_at', { ascending: false }).limit(courses.length);
-  if (fetchErr) throw fetchErr;
-  const idByTitle = new Map((storedCourses || []).map((c) => [c.title, c.id]));
-
-  const tests = [];
-  for (const c of courses) {
-    const cid = idByTitle.get(c.title);
-    if (!cid) continue;
-    const qs = buildTestsForCourse(c).map((q) => ({ ...q, course_id: cid }));
-    tests.push(...qs);
+  let courses;
+  try {
+    courses = await buildCourses();
+  } catch (err) {
+    console.error('[buildCourses] crashed:', err);
+    throw err;
   }
 
-  if (tests.length > 0) {
-    await admin.from('course_tests').delete().neq('course_id', null);
-    const chunk = 200;
-    for (let i = 0; i < tests.length; i += chunk) {
-      const slice = tests.slice(i, i + chunk);
-      const res = await admin.from('course_tests').insert(slice);
-      if (res.error) throw res.error;
+  console.log(`Seeding:
+    - AI_BRAIN: ingredients=${ingredients.length}, techniques=${techniques.length}
+    - COURSES: courses=${courses.length}`);
+
+  // Seeding AI_BRAIN
+  if (aiSupa) {
+    await upsertAll(aiSupa, 'ingredients', ingredients, { onConflict: 'id' });
+    console.log('Seed ingredients: OK (AI_BRAIN)');
+    await upsertAll(aiSupa, 'techniques', techniques, { onConflict: 'id' });
+    console.log('Seed techniques: OK (AI_BRAIN)');
+  }
+
+  // Seeding COURSES
+  if (coursesSupa) {
+    await coursesSupa.from('courses').delete().neq('tier', '');
+    await upsertAll(coursesSupa, 'courses', courses, { onConflict: 'tier,days_required' });
+    console.log('Seed courses: OK (COURSES)');
+
+    // Attach tests
+    const { data: storedCourses, error: fetchErr } = await coursesSupa.from('courses').select('id,title').order('created_at', { ascending: false }).limit(courses.length);
+    if (fetchErr) throw fetchErr;
+    const idByTitle = new Map((storedCourses || []).map((c) => [c.title, c.id]));
+
+    const tests = [];
+    for (const c of courses) {
+      const cid = idByTitle.get(c.title);
+      if (!cid) continue;
+      const testObj = buildTestsForCourse(c, cid);
+      tests.push(testObj);
     }
-    console.log(`Seed course_tests: OK (${tests.length} preguntas)`);
+
+    if (tests.length > 0) {
+      await coursesSupa.from('course_tests').delete().neq('course_id', null);
+      const chunk = 200;
+      for (let i = 0; i < tests.length; i += chunk) {
+        const slice = tests.slice(i, i + chunk);
+        const res = await coursesSupa.from('course_tests').insert(slice);
+        if (res.error) throw res.error;
+      }
+      console.log(`Seed course_tests: OK (${tests.length} preguntas en COURSES)`);
+    }
   }
 
-  console.log('Done.');
+  console.log('Seeding process completed.');
 }
 
+main().catch(console.error);
 main().catch((e) => {
   console.error('Seed failed:', e?.message || e);
   process.exit(1);

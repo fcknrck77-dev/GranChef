@@ -1,7 +1,18 @@
+import OpenAI from 'openai';
 import getCoreClient from './supabase/core';
 import getCoursesClient from './supabase/courses';
 import getLogsClient from './supabase/logs';
-import { GoogleGenAI } from '@google/genai';
+import getAiClient from './supabase/ai';
+import { getCulinaryKnowledge } from './ai_service';
+
+import { 
+  SYSTEM_IDENTITY, 
+  buildCoursePrompt,
+  buildIngredientPrompt,
+  buildTechniquePrompt,
+  buildRecipePrompt
+} from './culinary_prompts';
+import { fulfillAiRequest } from './ai_service';
 
 export interface GeneratedCourse {
   title: string;
@@ -11,97 +22,35 @@ export interface GeneratedCourse {
   reading_time?: string;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  SYSTEM PROMPT — Editorial Identity
-//  Establece la PERSONA del redactor antes de generar.
-//  Se envía como rol "system" para máxima adherencia por parte del modelo.
-// ─────────────────────────────────────────────────────────────────────────────
-const SYSTEM_IDENTITY = `
-Eres el RedactorMaestro de GrandChef Lab: una inteligencia editorial gastronómica autónoma de nivel internacional.
-
-Tu función exclusiva es generar manuales culinarios originales, extensos y densos en conocimiento técnico, 
-sin repetir párrafos ni copiar frases de publicaciones existentes. Usas la ciencia, 
-the técnica y la narrativa como un chef usa el fuego: con control absoluto.
-
-Reglas de identidad editorial:
-- Cada párrafo debe existir por una razón técnica o narrativa única.
-- Nunca repitas una idea ya desarrollada en el mismo texto, aunque cambie la forma.
-- Tu voz es la de un profesor de la CIA (Culinary Institute of America) escribiendo un manual interno.
-- Avanzas del concepto molecular al protocolo de cocina, nunca al revés.
-- Cada sección debe ser independientemente valiosa pero conectada al hilo del curso.
-- Prohibido: relleno, frases genéricas tipo "es importante saber que", listas de compras, 
-  recetas sin contexto técnico, y cualquier estructura tipo blog o artículo web.
-`.trim();
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  USER PROMPT — Instrucción de Generación por Nivel
 // ─────────────────────────────────────────────────────────────────────────────
-function buildUserPrompt(tier: 'FREE' | 'PRO' | 'PREMIUM', topic: string): string {
-  const tierSpecs: Record<string, string> = {
-    FREE: `
-NIVEL: FREE — Acceso base / Introducción de calidad
-EXTENSIÓN MÍNIMA OBLIGATORIA: 1800 palabras reales de contenido continuo.
-TONO: Accesible pero sin perder densidad técnica. El lector debe sentir que aprende algo que no encontraría en Google.
-PROPÓSITO: Despertar el apetito intelectual por la materia. Entregar conceptos fundacionales con rigor.
-    `.trim(),
-    PRO: `
-NIVEL: PRO — Dominio técnico aplicado
-EXTENSIÓN MÍNIMA OBLIGATORIA: 9000 palabras reales de contenido continuo.
-TONO: Profesional, metodológico, denso. El lector es un cocinero con 3+ años de brigada o escuela culinaria.
-PROPÓSITO: Elevar la comprensión técnica de un proceso hasta el nivel de reproducibilidad controlada.
-EXIGENCIA: Cada sección debe incluir al menos una referencia a ciencia aplicada (reacción química, parámetro físico, mecanismo biológico).
-    `.trim(),
-    PREMIUM: `
-NIVEL: PREMIUM — Maestría editorial culinaria
-EXTENSIÓN MÍNIMA OBLIGATORIA: 16000 palabras reales de contenido continuo.
-TONO: Magistral, estratégico, exhaustivo. El lector es un chef o gastronómomo con criterio propio.
-PROPÓSITO: Construir un mapa mental completo del tema: ciencia de fondo, técnica precisa, variables de cocina, fallas frecuentes, innovación aplicada, contexto histórico-cultural mínimo y estrategia creativa profesional.
-EXIGENCIA: Cobertura total del tema desde lo molecular hasta lo conceptual-creativo, sin lagunas.
-    `.trim(),
-  };
+const INGREDIENT_TOPICS = [
+  "Plancton Marino: producción, liofilización y potencial de umami marino",
+  "Ajo Negro: fermentación enzimática controlada y perfiles de acritud",
+  "Yuzu: terpenos cítricos y su rol en la acidez de vanguardia",
+  "Katsuobushi: el proceso de ahumado y fermentación del bonito",
+  "Sal de Camarga: cristales, trazas minerales y efecto en el sellado",
+  "Aceite de Argán: extracción tradicional y notas de frutos secos en cocina",
+  "Trufa Blanca de Alba: dimetilsulfuro y la volatilidad del aroma",
+  "Pimentón de la Vera: secado al humo y capsaicina controlada",
+  "Vainilla de Tahití: piperonal vs vainillina en perfiles aromáticos",
+  "Azafrán de la Mancha: crocina y safranal como agentes colorantes y aromáticos",
+];
 
-  return `
-TEMA DEL CURSO: "${topic}"
-
-${tierSpecs[tier]}
-
-ESTRUCTURA OBLIGATORIA — Redacta las siguientes 4 secciones en prosa continua (SIN listas, SIN viñetas, SIN subtítulos anidados):
-
-## 1. Introducción conceptual profunda
-Comienza desde la raíz científica o histórica del tema. Define el "por qué" antes del "cómo". 
-Esta sección debe hacer que el lector reconsidere lo que creía saber.
-
-## 2. Desarrollo técnico progresivo
-Explica el proceso técnico paso a paso, pero con narrativa fluida, no como receta. 
-Incluye parámetros, variables críticas, reacciones involucradas y errores frecuentes de brigada.
-
-## 3. Aplicación práctica profesional
-Lleva la teoría al servicio real. Describe cómo se ejecuta en una cocina viva, con presión de tiempo, 
-variantes de ingredientes, adaptaciones por temporada y decisiones de chef estratégicas.
-
-## 4. Cierre estratégico creativo
-Finaliza con una visión de alto nivel: cómo este conocimiento se convierte en diferenciación gastronómica, 
-posibles exploraciones creativas futuras, y qué define a un chef que domina este tema versus uno que solo lo conoce.
-
-─────────────────────────────────────────────────────────────────────────
-REGLAS ABSOLUTAS:
-- No menciones IA, AI, modelos, prompts, herramientas ni "como asistente".
-- No incluyas tiempo de lectura ni metadatos ajenos a la cocina.
-
-INSTRUCCIÓN TÉCNICA FINAL:
-
-1. Genera un TÍTULO ÚNICO para este curso (no el tema literal, sino un título editorial refinado).
-2. Genera una DESCRIPCIÓN de 2 frases máximo: precisa, atractiva y sin adornos vacíos.
-3. Devuelve SOLO este JSON (sin texto fuera del bloque):
-
-{
-  "title": "...",
-  "description": "...",
-  "full_content": "## 1. Introducción conceptual profunda\\n\\n[contenido]\\n\\n## 2. Desarrollo técnico progresivo\\n\\n[contenido]\\n\\n## 3. Aplicación práctica profesional\\n\\n[contenido]\\n\\n## 4. Cierre estratégico creativo\\n\\n[contenido]"
-}
-─────────────────────────────────────────────────────────────────────────
-`.trim();
-}
+const TECHNIQUE_TOPICS = [
+  "Esferificación inversa: control de lactato de calcio y alginato",
+  "Clarificación con agar-agar: red de polímeros y separación de sólidos",
+  "Liofilización: sublimación del agua y preservación de estructura molecular",
+  "Cocción a presión controlada: el efecto en la hidrólisis del colágeno",
+  "Infusión por vacío: impregnación de líquidos en matrices vegetales",
+  "Destilación por rotovapor: captura de notas top volátiles",
+  "Fermentación con Koji: proteólisis y amilólisis acelerada",
+  "Niztamalización: el impacto del hidróxido de calcio en el maíz",
+  "Curado en seco (Dry Aging): actividad enzimática y concentración de sabor",
+  "Decantación centrífuga: separación de fases en caldos y jugos",
+];
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Topic Pool
@@ -164,8 +113,16 @@ const ALL_TOPICS = [
   "La construcción de sabor por capas: base, arco y punto de tensión en el plato final",
   "Acidez como herramienta editorial del plato: uso intencional de ácidos en cocina salada",
   "Sal y salado: percepción sensorial, tipos de sal, momento de aplicación y efecto en producto",
-  "Amargor controlado: ingredientes, umbral de percepción y su rol en menús degustación",
   "La pirámide del umami: proteínas, nucleótidos y sinergia con ácido glutámico libre",
+  "Fermentación controlada en panadería: levaduras salvajes vs comerciales",
+  "El mundo de los caldos: desde el consomé clarificado hasta el ramen tonkotsu",
+  "Técnicas de corte japonesas: Katsuramuki y su aplicación en la estética del plato",
+  "Humo líquido vs ahumado natural: química del humo y seguridad alimentaria",
+  "Aceites esenciales en cocina: extracción, dilución y potencia aromática",
+  "La ciencia de las espumas: sifón iSi, agentes espumantes y estabilidad térmica",
+  "Cocreación Chef e IA: cómo usar algoritmos para descubrir maridajes inéditos",
+  "Protocolos de servicio de sala: la coreografía entre cocina y comensal",
+  "Gestión de costes en alta cocina: ingeniería de menú y escandallos de precisión",
 ];
 
 function pickTopicsForCycle(tiers: string[]): string[] {
@@ -191,8 +148,48 @@ export async function generateCourseCycle() {
   if (cycleErr) throw cycleErr;
 
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    const model = process.env.GEMINI_MODEL || 'gemini-2.5-pro';
+    const orKey = process.env.OPENROUTER_API_KEY;
+    const groqKey1 = process.env.GROQ_API_KEY;
+    const groqKey2 = process.env.GROQ_API_KEY_2;
+    
+    const getAiConfigs = () => {
+      const configs = [];
+      if (orKey) {
+        configs.push({
+          client: new OpenAI({
+            apiKey: orKey,
+            baseURL: 'https://openrouter.ai/api/v1',
+            defaultHeaders: { 'HTTP-Referer': 'https://grandchefapp.online', 'X-Title': 'GrandChef Engine' }
+          }),
+          model: process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct',
+          name: 'OpenRouter'
+        });
+      }
+      if (groqKey1) {
+        configs.push({
+          client: new OpenAI({
+            apiKey: groqKey1,
+            baseURL: 'https://api.groq.com/openai/v1',
+          }),
+          model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+          name: 'Groq-1'
+        });
+      }
+      if (groqKey2) {
+        configs.push({
+          client: new OpenAI({
+            apiKey: groqKey2,
+            baseURL: 'https://api.groq.com/openai/v1',
+          }),
+          model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+          name: 'Groq-2'
+        });
+      }
+      return configs;
+    };
+
+    const aiConfigs = getAiConfigs();
+    if (aiConfigs.length === 0) throw new Error('No AI Provider (OpenRouter/Groq) configured');
 
     const tiers: ('FREE' | 'PRO' | 'PREMIUM')[] = [
       'FREE', 'FREE',
@@ -206,31 +203,37 @@ export async function generateCourseCycle() {
       const tier = tiers[i];
       const topic = topics[i];
 
-      console.log(`[GrandChef Engine (Gemini)] Generating ${tier} course: "${topic}"...`);
-
-      const systemPrompt = SYSTEM_IDENTITY;
-      const userPrompt = buildUserPrompt(tier, topic);
+      const knowledge = await getCulinaryKnowledge(topic);
+      const userPrompt = buildCoursePrompt(tier, topic, knowledge);
 
       let response;
-      try {
-        response = await ai.models.generateContent({
-          model,
-          contents: userPrompt,
-          config: {
-            systemInstruction: systemPrompt,
-            responseMimeType: 'application/json',
+      let success = false;
+
+      for (const config of aiConfigs) {
+        try {
+          console.log(`[GrandChef Engine] Generating ${tier} course: "${topic}" using ${config.name} (${config.model})...`);
+          response = await config.client.chat.completions.create({
+            model: config.model,
+            messages: [{ role: 'system', content: SYSTEM_IDENTITY }, { role: 'user', content: userPrompt }],
+            response_format: { type: 'json_object' },
             temperature: 0.8
-          }
-        });
-      } catch (genErr) {
-        console.error(`[GrandChef Engine] Error generating course "${topic}":`, genErr);
+          });
+          success = true;
+          break;
+        } catch (genErr) {
+          console.error(`[GrandChef Engine] ${config.name} failed for topic "${topic}":`, (genErr as any).message);
+        }
+      }
+
+      if (!success || !response) {
+        console.error(`[GrandChef Engine] All AI providers failed for topic "${topic}". Skipping.`);
         continue;
       }
 
       let result: GeneratedCourse;
       try {
-        const textResponse = response.text;
-        result = JSON.parse(textResponse || '{}');
+        const textResponse = response.choices[0].message?.content || '{}';
+        result = JSON.parse(textResponse);
         if (!result.title || !result.full_content) {
           console.error(`[GrandChef Engine] Invalid course output for topic "${topic}". Skipping.`);
           continue;
@@ -257,7 +260,33 @@ export async function generateCourseCycle() {
         continue;
       }
 
-      console.log(`[GrandChef Engine] ✓ ${tier} course saved in COURSES shard: "${result.title}" (${wordCount} words)`);
+      console.log(`[GrandChef Engine] ✓ ${tier} course saved: "${result.title}" (${wordCount} words)`);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 2. GENERATE LABORATORY CONTENT (Ingredients & Techniques)
+    // ─────────────────────────────────────────────────────────────────────────
+    const supaAiBrain = getAiClient();
+    if (supaAiBrain) {
+      const randomIngs = [...INGREDIENT_TOPICS].sort(() => Math.random() - 0.5).slice(0, 3);
+      const randomTechs = [...TECHNIQUE_TOPICS].sort(() => Math.random() - 0.5).slice(0, 3);
+
+      for (const t of randomIngs) {
+        try {
+          const req = await supaLogs.from('ai_requests').insert({ kind: 'ingredients', instruction: t, status: 'pending' }).select().single();
+          if (req.data) await fulfillAiRequest(req.data.id);
+        } catch (e) {
+          console.error(`[GrandChef Engine] Laboratory Ing Error:`, e);
+        }
+      }
+      for (const t of randomTechs) {
+        try {
+          const req = await supaLogs.from('ai_requests').insert({ kind: 'techniques', instruction: t, status: 'pending' }).select().single();
+          if (req.data) await fulfillAiRequest(req.data.id);
+        } catch (e) {
+          console.error(`[GrandChef Engine] Laboratory Tech Error:`, e);
+        }
+      }
     }
 
     await supaLogs.from('engine_cycles').update({
@@ -265,7 +294,7 @@ export async function generateCourseCycle() {
       completed_at: new Date().toISOString()
     }).eq('id', cycle.id);
 
-    console.log(`[GrandChef Engine] ✓ Cycle ${cycleId} completed in LOGS shard.`);
+    console.log(`[GrandChef Engine] ✓ Full Cycle ${cycleId} completed.`);
     return { ok: true, cycleId };
 
   } catch (err: any) {

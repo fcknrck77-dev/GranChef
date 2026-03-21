@@ -1,15 +1,34 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ingredients as localIngredients, Ingredient } from '@/data/ingredients';
-import { techniques as localTechniques, Technique } from '@/data/techniques';
-import { recipes } from '@/data/recipes';
 import { ACCESS_CONFIGS } from '@/data/access';
 import DetailModal from '@/components/DetailModal';
 import LockedOverlay from '@/components/LockedOverlay';
 import { useUserAuth } from '@/context/UserAuthContext';
 import { useAdminAuth } from '@/context/AdminAuthContext';
 import { getSupabase } from '@/lib/supabaseClient';
+import { Loader2, BookOpen } from 'lucide-react';
+
+export interface Ingredient {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  pairingNotes: string[];
+  family: string;
+  stories?: Record<string, string>;
+}
+
+export interface Technique {
+  id: string;
+  name: string;
+  category: 'Texturizacion' | 'Termica' | 'Extraccion' | 'Presentacion';
+  description: string;
+  difficulty: 'Basico' | 'Intermedio' | 'Avanzado' | 'Maestro';
+  equipment: string[];
+  reagents?: string[];
+  pairingNotes: string[];
+}
 
 export default function Laboratory() {
   const { getEffectiveLevel, requireAuth } = useUserAuth();
@@ -19,8 +38,9 @@ export default function Laboratory() {
   const [isMixing, setIsMixing] = useState(false);
   const [result, setResult] = useState<{ title: string; text: string; type: 'success' | 'experiment' | 'discovery' | 'fiasco' } | null>(null);
   const [selectedItem, setSelectedItem] = useState<Ingredient | Technique | null>(null);
-  const [ingredientsData, setIngredientsData] = useState<Ingredient[]>(localIngredients);
-  const [techniquesData, setTechniquesData] = useState<Technique[]>(localTechniques);
+  const [ingredientsData, setIngredientsData] = useState<Ingredient[]>([]);
+  const [techniquesData, setTechniquesData] = useState<Technique[]>([]);
+  const [loading, setLoading] = useState(true);
   
   const userLevel = getEffectiveLevel();
   const { isAdmin } = useAdminAuth();
@@ -30,8 +50,8 @@ export default function Laboratory() {
   const canAccessRecipe = (tier: 'FREE' | 'PRO' | 'PREMIUM') =>
     isAdmin ||
     tier === 'FREE' ||
-    (tier === 'PRO' && (userLevel === 'PRO' || userLevel === 'PREMIUM')) ||
-    (tier === 'PREMIUM' && userLevel === 'PREMIUM');
+    (tier === 'PRO' && (userLevel === 'PRO' || userLevel === 'PREMIUM' || userLevel === 'ENTERPRISE')) ||
+    (tier === 'PREMIUM' && (userLevel === 'PREMIUM' || userLevel === 'ENTERPRISE'));
 
   // Show ALL items but mark which are locked
   const availableIngredients = ingredientsData;
@@ -90,70 +110,49 @@ export default function Laboratory() {
     })();
   }, []);
 
-  const handleMix = () => {
+  const handleMix = async () => {
     if (!slotA || !slotB) return;
     setIsMixing(true);
     setResult(null);
     
-    setTimeout(() => {
-      setIsMixing(false);
+    try {
+      // Real knowledge retrieval via AI library
+      const query = `${slotA.name} + ${slotB.name}${slotTech ? ` + ${slotTech.name}` : ''}`;
+      const res = await fetch(`/api/ai/knowledge?q=${encodeURIComponent(query)}`);
+      const { knowledge } = await res.json();
       
-      const storyA = slotA.stories?.[slotB.name];
-      const storyB = slotB.stories?.[slotA.name];
-      const story = storyA || storyB;
-
-      const isCompatible = slotA.pairingNotes.includes(slotB.name) || slotB.pairingNotes.includes(slotA.name);
+      const hasRealKnowledge = knowledge && !knowledge.includes('No se encontraron');
       
-      const techBonus = slotTech ? slotTech.pairingNotes.some(p => 
-        slotA.name.toLowerCase().includes(p.toLowerCase()) || 
-        slotB.name.toLowerCase().includes(p.toLowerCase()) ||
-        slotA.family.toLowerCase().includes(p.toLowerCase())
-      ) : false;
-
-      if (slotTech && !techBonus && Math.random() > 0.7) {
+      if (hasRealKnowledge) {
         setResult({
-          title: "¡Inestabilidad molecular!",
-          text: `La técnica de ${slotTech.name} ha colapsado. La estructura de ${slotA.name} no ha soportado el proceso químico. Resultado inestable.`,
-          type: 'fiasco'
-        });
-        return;
-      }
-
-      if (story) {
-        setResult({
-          title: techBonus ? "¡Obra maestra vanguardista!" : "¡Sinergia descubierta!",
-          text: techBonus 
-            ? `Elevando la combinación: ${story}. Los equipos de ${slotTech?.equipment.join(' y ')} han optimizado la textura.`
-            : story,
+          title: slotTech ? "¡Sinergia Tecnológica Descubierta!" : "¡Afinidad Molecular Encontrada!",
+          text: knowledge,
           type: 'discovery'
         });
-      } else if (isCompatible) {
-        setResult({
-          title: techBonus ? "Textura Revolucionaria" : "Afinidad Confirmada",
-          text: techBonus
-            ? `La técnica ${slotTech?.name} ha servido como puente perfecto. Una ejecución técnica impecable.`
-            : `${slotA.name} y ${slotB.name} presentan una alta compatibilidad aromática.`,
-          type: 'success'
-        });
       } else {
+        // Fallback to local logic if no specific pairing in library
+        const isCompatible = slotA.pairingNotes.includes(slotB.name) || slotB.pairingNotes.includes(slotA.name);
         setResult({
-          title: "Anomalía de sabor",
-          text: `${slotA.name} y ${slotB.name} presentan perfiles discordantes. Requieres un agente de puente molecular.`,
-          type: 'experiment'
+          title: isCompatible ? "Afinidad Confirmada" : "Anomalía de Sabor",
+          text: isCompatible 
+            ? `${slotA.name} y ${slotB.name} son compatibles según perfiles estándar. ${slotTech ? `La técnica ${slotTech.name} ayuda a estabilizar el puente.` : ''}`
+            : `No se registra una sinergia directa entre ${slotA.name} y ${slotB.name}. Sugerimos un agente de puente molecular.`,
+          type: isCompatible ? 'success' : 'experiment'
         });
       }
-    }, 2000);
+    } catch (err) {
+      setResult({
+        title: "Error de Laboratorio",
+        text: "La simulación ha fallado por inestabilidad en el sistema.",
+        type: 'fiasco'
+      });
+    } finally {
+      setIsMixing(false);
+    }
   };
 
   const matchingRecipes = () => {
-    if (!slotA && !slotB && !slotTech) return [];
-    const selectedNames = [slotA?.name, slotB?.name].filter(Boolean).map((v) => v!.toLowerCase());
-    const selectedTech = slotTech?.id;
-    return recipes.filter((r) => {
-      const hasIng = selectedNames.some((n) => r.ingredients.some((ing) => ing.name.toLowerCase().includes(n)));
-      const hasTech = selectedTech ? r.techniques.includes(selectedTech) : false;
-      return hasIng || hasTech;
-    }).slice(0, 6);
+    return []; // We'll move recipes to COURSES shard soon.
   };
 
   return (
@@ -267,23 +266,10 @@ export default function Laboratory() {
               <p>Filtradas por ingredientes y técnicas seleccionadas.</p>
             </div>
             <div className="recipe-list">
-              {matchingRecipes().length === 0 && <p className="empty-recipes">Sin coincidencias por ahora.</p>}
-              {matchingRecipes().map((rec) => {
-                const locked = !canAccessRecipe(rec.tier);
-                return (
-                  <div key={rec.id} className={`recipe-chip ${locked ? 'locked' : ''}`}>
-                    <div>
-                      <div className="chip-title">{rec.title}</div>
-                      <div className="chip-meta">Plan {rec.tier} · {rec.times.prepMin + rec.times.cookMin} min</div>
-                    </div>
-                    {locked ? (
-                      <button className="unlock-btn" onClick={() => requireAuth(() => { window.location.href = '/pricing'; })}>Desbloquear</button>
-                    ) : (
-                      <button className="unlock-btn" onClick={() => requireAuth(() => { window.location.href = '/recipes'; })}>Ver receta</button>
-                    )}
-                  </div>
-                );
-              })}
+              <div className="empty-recipes-card flex-center py-20 text-subtle">
+                <BookOpen className="w-20 h-20 mr-10" />
+                <p>Las recetas sugeridas del CORE se integrarán en la próxima fase.</p>
+              </div>
             </div>
           </div>
         )}

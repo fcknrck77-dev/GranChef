@@ -7,6 +7,8 @@ import { UserAuthProvider } from "@/context/UserAuthContext";
 import Footer from "@/components/Footer";
 import SecurityLayer from "@/components/SecurityLayer";
 import GlobalAuthGuard from "@/components/GlobalAuthGuard";
+import { TrialBlockedModal } from "@/components/TrialBlockedModal";
+import HelpChat from "@/components/HelpChat";
 
 export const metadata: Metadata = {
   title: "GrandChef Lab - Omniscience",
@@ -25,6 +27,8 @@ export default function RootLayout({
         <AdminAuthProvider>
           <UserAuthProvider>
             <GlobalAuthGuard />
+            <TrialBlockedModal />
+            <HelpChat />
             <Navbar />
             <main style={{ flex: 1 }}>
               {children}

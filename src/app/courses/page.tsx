@@ -185,8 +185,8 @@ export default function Courses() {
           const hasTierAccess = isAdmin ||
                                userLevel === 'ADMIN' || 
                                (course.tier === 'FREE') || 
-                               (course.tier === 'PRO' && (userLevel === 'PRO' || userLevel === 'PREMIUM')) ||
-                               (course.tier === 'PREMIUM' && userLevel === 'PREMIUM');
+                               (course.tier === 'PRO' && (userLevel === 'PRO' || userLevel === 'PREMIUM' || userLevel === 'ENTERPRISE')) ||
+                               (course.tier === 'PREMIUM' && (userLevel === 'PREMIUM' || userLevel === 'ENTERPRISE'));
           
           const lockedByTier = isReleased && !hasTierAccess;
           const comingSoon = !isReleased;

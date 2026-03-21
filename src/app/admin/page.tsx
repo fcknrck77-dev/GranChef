@@ -155,6 +155,21 @@ export default function AdminDashboard() {
     { label: 'Estado Motor', val: canStart ? 'LISTO' : 'ESPERA', trend: 'HACCP/Cooldown', icon: <Shield size={20}/> },
   ];
 
+  const handleManualSeed = async () => {
+    if (!confirm('¿Seguro que quieres forzar la generación de contenido ahora? Esto ignorará el cooldown de 72h.')) return;
+    setEngineLoading(true);
+    try {
+      const res = await fetch('/api/admin/seed', { method: 'POST' });
+      if (!res.ok) throw new Error('seed_failed');
+      alert('Contenido sembrado con éxito. Revisa la Enciclopedia y el Laboratorio.');
+      await fetchEngineStatus();
+    } catch (err) {
+      alert('Error al sembrar contenido. Revisa logs.');
+    } finally {
+      setEngineLoading(false);
+    }
+  };
+
   return (
     <div className="admin-dashboard">
       <header className="page-header">
@@ -183,7 +198,7 @@ export default function AdminDashboard() {
             <div className="section-header">
               <h3><Zap size={20} className="mr-10 text-primary" /> Motor Gastronómico</h3>
               <span className={`engine-status ${canStart ? 'ready' : 'waiting'}`}>
-                {engineLoading ? 'GENERANDO...' : canStart ? 'ONLINE / LISTO' : 'COOLDOWN / 96H'}
+                {engineLoading ? 'GENERANDO...' : canStart ? 'ONLINE / LISTO' : 'COOLDOWN / 72H'}
               </span>
             </div>
 
@@ -198,14 +213,25 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            <button 
-              className={`engine-trigger-btn ${canStart ? 'active' : 'disabled'}`}
-              onClick={handleTriggerCycle}
-              disabled={engineLoading}
-            >
-              {engineLoading ? <RefreshCw className="animate-spin mr-10" /> : <Sparkles size={18} className="mr-10" />}
-              {engineLoading ? 'PROCESANDO...' : 'SOLICITAR CICLO DE IA'}
-            </button>
+            <div className="engine-actions" style={{ display: 'flex', gap: '15px' }}>
+              <button 
+                className={`engine-trigger-btn ${canStart ? 'active' : 'disabled'}`}
+                onClick={handleTriggerCycle}
+                disabled={engineLoading}
+              >
+                {engineLoading ? <RefreshCw className="animate-spin mr-10" /> : <Sparkles size={18} className="mr-10" />}
+                {engineLoading ? 'PROCESANDO...' : 'SOLICITAR CICLO'}
+              </button>
+              <button 
+                className="engine-trigger-btn active"
+                style={{ background: '#ff0055' }}
+                onClick={handleManualSeed}
+                disabled={engineLoading}
+              >
+                <RefreshCw className={engineLoading ? "animate-spin mr-10" : "mr-10"} size={18} />
+                SEMBRAR DATOS (FORZAR)
+              </button>
+            </div>
           </section>
 
           <section className="ai-control-center glass mb-30">

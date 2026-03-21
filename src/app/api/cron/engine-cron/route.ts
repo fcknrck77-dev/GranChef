@@ -4,7 +4,7 @@ import { generateCourseCycle } from '@/lib/gastronomic_engine';
 
 function nextCycleDueFrom(latestCreatedAt: string) {
   const lastDate = new Date(latestCreatedAt);
-  return new Date(lastDate.getTime() + 96 * 3600 * 1000);
+  return new Date(lastDate.getTime() + 72 * 3600 * 1000);
 }
 
 export async function POST(req: Request) {

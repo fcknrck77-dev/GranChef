@@ -4,11 +4,11 @@ import { requireAdmin, requireSupabaseAdmin } from '../../_utils';
 export const dynamic = 'force-dynamic';
 
 type PatchBody = {
-  status?: 'active' | 'blocked' | 'suspended';
-  plan?: 'FREE' | 'PRO' | 'PREMIUM';
+  status?: 'active' | 'blocked' | 'suspended' | 'cancelled';
+  plan?: 'FREE' | 'PRO' | 'PREMIUM' | 'ENTERPRISE';
   notes?: string;
   markPaid?: boolean;
-  planOverride?: { plan: 'FREE' | 'PRO' | 'PREMIUM'; until: string; reason: string } | null;
+  planOverride?: { plan: 'FREE' | 'PRO' | 'PREMIUM' | 'ENTERPRISE'; until: string; reason: string } | null;
   addReward?: { type: string; label: string; meta?: any };
 };
 

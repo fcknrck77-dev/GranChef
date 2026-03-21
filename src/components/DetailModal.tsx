@@ -1,16 +1,50 @@
 'use client';
 
-import { Ingredient } from '@/data/ingredients';
-import { Technique } from '@/data/techniques';
-import { recipes as localRecipes, type Recipe } from '@/data/recipes';
 import Link from 'next/link';
 import { useUserAuth } from '@/context/UserAuthContext';
 import { useAdminAuth } from '@/context/AdminAuthContext';
 import { getSupabase } from '@/lib/supabaseClient';
 import { useEffect, useMemo, useState } from 'react';
 
+export interface Ingredient {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  pairingNotes: string[];
+  family: string;
+  stories?: Record<string, string>;
+}
+
+export interface Technique {
+  id: string;
+  name: string;
+  category: 'Texturizacion' | 'Termica' | 'Extraccion' | 'Presentacion';
+  description: string;
+  difficulty: 'Basico' | 'Intermedio' | 'Avanzado' | 'Maestro';
+  equipment: string[];
+  reagents?: string[];
+  pairingNotes: string[];
+}
+
+export interface Recipe {
+  id: string;
+  title: string;
+  source: string;
+  tier: 'FREE' | 'PRO' | 'PREMIUM';
+  difficulty: 'Basico' | 'Intermedio' | 'Avanzado' | 'Maestro';
+  servings: number;
+  times: { prepMin: number; cookMin: number };
+  description: string;
+  utensils: string[];
+  ingredients: Array<{ name: string; amount: string; unit: string; notes?: string }>;
+  steps: string[];
+  techniques: string[];
+  tags: string[];
+}
+
 interface DetailModalProps {
-  item: Ingredient | Technique;
+  item: Ingredient | Technique | Recipe;
   onClose: () => void;
 }
 
@@ -36,32 +70,16 @@ export default function DetailModal({ item, onClose }: DetailModalProps) {
 
   const norm = (s: string) => s.trim().toLowerCase();
 
-  const localRelated: Recipe[] = useMemo(() => {
-    if ('family' in item) {
-      const name = norm(item.name);
-      return localRecipes.filter((r) =>
-        r.ingredients.some((ing) => {
-          const iname = norm(ing.name);
-          return iname === name || iname.includes(name) || name.includes(iname);
-        })
-      );
-    }
-    return localRecipes.filter((r) => r.techniques.includes(item.id));
-  }, [item]);
-
-  const [related, setRelated] = useState<Recipe[]>(localRelated.slice(0, 6));
+  const [related, setRelated] = useState<Recipe[]>([]);
 
   useEffect(() => {
-    setRelated(localRelated.slice(0, 6));
-
     const supabase = getSupabase('AI_BRAIN');
     if (!supabase) return;
 
     (async () => {
       try {
         if ('family' in item) {
-          // JSONB ingredient matching is hard to query precisely; fetch recent recipes and filter client-side.
-          const res = await supabase.from('recipes').select('*').order('created_at', { ascending: false }).limit(250);
+          const res = await supabase.from('recipes').select('*').order('created_at', { ascending: false }).limit(200);
           if (res.error || !res.data) return;
           const needle = norm(item.name);
           const mapped = res.data
@@ -87,7 +105,7 @@ export default function DetailModal({ item, onClose }: DetailModalProps) {
               })
             )
             .slice(0, 6);
-          if (mapped.length > 0) setRelated(mapped);
+          setRelated(mapped);
         } else {
           const res = await supabase
             .from('recipes')
@@ -111,13 +129,13 @@ export default function DetailModal({ item, onClose }: DetailModalProps) {
             techniques: Array.isArray(r.techniques) ? r.techniques.map(String) : [],
             tags: Array.isArray(r.tags) ? r.tags.map(String) : [],
           }));
-          if (mapped.length > 0) setRelated(mapped);
+          setRelated(mapped);
         }
-      } catch {
-        // keep fallback
+      } catch (err) {
+        console.error('Failed to fetch related recipes:', err);
       }
     })();
-  }, [item, localRelated]);
+  }, [item]);
 
   return (
     <div className="detail-modal-overlay animate-fadeIn" onClick={onClose}>
@@ -126,9 +144,9 @@ export default function DetailModal({ item, onClose }: DetailModalProps) {
         <div className="modal-content">
           <div className="modal-header">
             <span className="modal-category">
-              {'family' in item ? item.family : item.category}
+              {'family' in item ? item.family : ('category' in item ? item.category : 'RECETA')}
             </span>
-            <h2 className="modal-title">{item.name}</h2>
+            <h2 className="modal-title">{'name' in item ? item.name : (item as any).title || (item as any).name}</h2>
             {'difficulty' in item && (
               <span className={`diff-tag ${cssKey(item.difficulty)}`}>
                 Protocolo: {item.difficulty}
@@ -145,9 +163,11 @@ export default function DetailModal({ item, onClose }: DetailModalProps) {
             <section className="modal-section">
               <h4>MATRIZ DE SINERGIA</h4>
               <div className="full-pill-grid">
-                {item.pairingNotes.map(p => (
+                {('pairingNotes' in item) ? item.pairingNotes.map((p: string) => (
                   <span key={p} className="pill large">{p}</span>
-                ))}
+                )) : (
+                  <p>Maridajes no disponibles para esta receta.</p>
+                )}
               </div>
             </section>
 
