@@ -2,10 +2,12 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 
+import { MessageSquareCode, Send, X, Bot, User as UserIcon } from 'lucide-react';
+
 export default function HelpChat() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
-    { role: 'bot', text: '¡Hola! Soy el asistente de GrandChef. ¿En qué puedo ayudarte profesionalmente hoy?' }
+    { role: 'bot', text: '¡Bienvenido a la Central de Inteligencia GrandChef! ¿Cómo puedo asistir a su equipo hoy?' }
   ]);
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -16,13 +18,12 @@ export default function HelpChat() {
     setMessages(prev => [...prev, userMsg]);
     setInput('');
 
-    // Mocking AI Response for help (Could call /api/ai/knowledge)
     setTimeout(() => {
       setMessages(prev => [...prev, { 
         role: 'bot', 
-        text: 'He registrado tu consulta. Para asistencia técnica inmediata, también puedes consultar la sección de Ayuda en tu perfil enterprise.' 
+        text: 'He registrado su consulta técnica. Un consultor de GrandChef revisará su caso. Recuerde que el Soporte Enterprise está activo 24/7.' 
       }]);
-    }, 1000);
+    }, 1200);
   };
 
   useEffect(() => {
@@ -30,18 +31,27 @@ export default function HelpChat() {
   }, [messages]);
 
   return (
-    <div className="fixed bottom-10 right-10 z-[1000]">
+    <div className="fixed bottom-8 right-8 z-[10000]">
       {isOpen ? (
-        <div className="w-80 h-96 glass rounded-3xl border border-white/10 flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-          <header className="p-4 bg-primary text-black flex justify-between items-center font-bold">
-            <span>Asistencia GrandChef</span>
-            <button onClick={() => setIsOpen(false)}>×</button>
+        <div className="w-80 h-[450px] chat-popup rounded-2xl border border-white/10 flex flex-col shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
+          <header className="p-4 bg-zinc-900 border-b border-white/5 flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+              <span className="text-xs font-bold tracking-widest text-zinc-400 uppercase">Soporte Corporativo</span>
+            </div>
+            <button onClick={() => setIsOpen(false)} className="text-zinc-500 hover:text-white transition-colors">
+               <X size={18} />
+            </button>
           </header>
           
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-black/40">
             {messages.map((m, i) => (
               <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[80%] p-3 rounded-2xl text-xs ${m.role === 'user' ? 'bg-zinc-800' : 'bg-primary/20 text-primary border border-primary/20'}`}>
+                <div className={`p-3 rounded-xl text-[11px] leading-relaxed ${
+                  m.role === 'user' 
+                    ? 'bg-primary text-black font-bold ml-8 rounded-tr-none' 
+                    : 'bg-zinc-800 text-zinc-100 mr-8 rounded-tl-none border border-white/5'
+                }`}>
                   {m.text}
                 </div>
               </div>
@@ -49,33 +59,36 @@ export default function HelpChat() {
             <div ref={scrollRef} />
           </div>
 
-          <footer className="p-3 border-t border-white/5 flex gap-2">
+          <footer className="p-4 bg-zinc-900 border-t border-white/5 flex gap-2">
             <input 
               type="text" 
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleSend()}
-              placeholder="Pregunta algo..."
-              className="flex-1 bg-white/5 border border-white/5 rounded-xl px-3 py-2 text-xs outline-none"
+              placeholder="Asistencia técnica..."
+              className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[11px] outline-none text-white placeholder:text-zinc-600 focus:border-primary/40 transition-colors"
             />
-            <button onClick={handleSend} className="p-2 bg-primary text-black rounded-xl">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-              </svg>
+            <button onClick={handleSend} className="p-2 bg-primary text-black rounded-lg hover:scale-105 active:scale-95 transition-all">
+              <Send size={14} />
             </button>
           </footer>
         </div>
       ) : (
         <button 
           onClick={() => setIsOpen(true)}
-          className="w-16 h-16 bg-primary text-black rounded-full shadow-2xl flex items-center justify-center text-2xl hover:scale-110 transition-transform active:scale-95 border-4 border-black group"
+          className="w-14 h-14 bg-zinc-900 text-primary border border-primary/20 rounded-full shadow-2xl flex items-center justify-center hover:scale-110 hover:border-primary/50 transition-all active:scale-95 group relative"
         >
-          <span className="group-hover:rotate-12 transition-transform">🤖</span>
+          <div className="absolute inset-0 rounded-full bg-primary/10 animate-ping group-hover:bg-primary/20" />
+          <MessageSquareCode size={24} className="relative z-10" />
         </button>
       )}
 
       <style jsx>{`
-        .glass { background: rgba(0,0,0,0.8); backdrop-filter: blur(20px); }
+        .chat-popup { 
+          background: rgba(10,10,12,0.95); 
+          backdrop-filter: blur(20px); 
+          box-shadow: 0 20px 50px rgba(0,0,0,0.5), 0 0 20px rgba(var(--primary-rgb), 0.05);
+        }
       `}</style>
     </div>
   );

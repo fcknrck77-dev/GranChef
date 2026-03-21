@@ -354,74 +354,37 @@ async function buildCourses() {
       `Entrega solo el texto final con las cuatro secciones en párrafos continuos.`
     ].join('\n');
 
-    const orKey = process.env.OPENROUTER_API_KEY;
-    const groqKey1 = process.env.GROQ_API_KEY;
-    const groqKey2 = process.env.GROQ_API_KEY_2;
-    
-    const getAiConfigs = () => {
-      const configs = [];
-      if (orKey) {
-        configs.push({
-          apiKey: orKey,
-          baseURL: 'https://openrouter.ai/api/v1',
-          headers: { 'HTTP-Referer': 'https://grandchefapp.online', 'X-Title': 'GrandChef Seeder' },
-          model: process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct',
-          name: 'OpenRouter'
-        });
-      }
-      if (groqKey1) {
-        configs.push({
-          apiKey: groqKey1,
-          baseURL: 'https://api.groq.com/openai/v1',
-          model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
-          name: 'Groq-1'
-        });
-      }
-      if (groqKey2) {
-        configs.push({
-          apiKey: groqKey2,
-          baseURL: 'https://api.groq.com/openai/v1',
-          model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
-          name: 'Groq-2'
-        });
-      }
-      return configs;
-    };
-
-    const aiConfigs = getAiConfigs();
-    if (aiConfigs.length === 0) throw new Error('No AI Provider (OpenRouter/Groq) configured in .env.local');
-
     let content = null;
-    let success = false;
+    try {
+      console.log(`[buildContinuousContent] Attempting with local Ollama (llama3) for ${tier}...`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10 * 60 * 1000); // 10 minutes timeout
 
-    for (const config of aiConfigs) {
-      try {
-        console.log(`[buildContinuousContent] Attempting with ${config.name} (${config.model}) for ${tier}...`);
-        const client = new OpenAI({
-          apiKey: config.apiKey,
-          baseURL: config.baseURL,
-          defaultHeaders: config.headers || {}
-        });
+      const response = await fetch('http://127.0.0.1:11434/api/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'phi',
+          prompt: `System: Eres el RedactorMaestro de GrandChef Lab: redacción editorial gastronómica de nivel internacional, precisión técnica y estilo de escuela culinaria.\n\nUser: ${prompt}`,
+          stream: false
+        }),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
 
-        const completion = await client.chat.completions.create({
-          model: config.model,
-          messages: [
-            { role: 'system', content: 'Eres el RedactorMaestro de GrandChef Lab: redacción editorial gastronómica de nivel internacional, precisión técnica y estilo de escuela culinaria.' },
-            { role: 'user', content: prompt }
-          ],
-          temperature: 0.7
-        });
-        content = completion.choices[0].message?.content;
-        if (content) {
-          success = true;
-          break;
-        }
-      } catch (e) {
-        console.warn(`[buildContinuousContent] ${config.name} failed: ${e.message}`);
+      if (!response.ok) {
+        throw new Error(`Ollama locally failed: ${response.statusText}`);
       }
+      
+      const data = await response.json();
+      content = data.response;
+    } catch (e) {
+      console.warn(`[buildContinuousContent] Ollama failed: ${e.message}`);
     }
 
-    if (!success || !content) throw new Error('Generación fallida: todos los proveedores de AI fallaron.');
+    if (!content) throw new Error('Generación fallida: el modelo local Ollama falló o no está iniciado.');
     return { content, generationCycleId };
   };
 
@@ -564,9 +527,17 @@ async function main() {
   }
 
   const coreSupa = getSupa('SUPABASE_CORE_URL', 'SUPABASE_CORE_SERVICE_KEY') || getSupa('SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY');
-  const coursesSupa = getSupa('SUPABASE_COURSES_URL', 'SUPABASE_COURSES_SERVICE_KEY') || coreSupa;
-  const aiSupa = getSupa('SUPABASE_AI_URL', 'SUPABASE_AI_SERVICE_KEY') || getSupa('SUPABASE_AI_BRAIN_URL', 'SUPABASE_AI_BRAIN_SERVICE_KEY') || coreSupa;
+  const coursesSupa = getSupa('SUPABASE_COURSES_URL', 'SUPABASE_COURSES_SERVICE_KEY');
+  const aiSupa = getSupa('SUPABASE_AI_BRAIN_URL', 'SUPABASE_AI_BRAIN_SERVICE_KEY') || getSupa('SUPABASE_AI_URL', 'SUPABASE_AI_SERVICE_KEY');
 
+  if (!coreSupa) console.error('⚠️ [Seed] CORE Shard is NOT available. This will likely fail.');
+  if (!coursesSupa) console.warn('⚠️ [Seed] COURSES Shard is NOT available. Falling back to CORE for courses.');
+  if (!aiSupa) console.warn('⚠️ [Seed] AI_BRAIN Shard is NOT available. Falling back to CORE for ingredients/techniques.');
+
+  const finalCoursesSupa = coursesSupa || coreSupa;
+  const finalAiSupa = aiSupa || coreSupa;
+
+  if (!finalCoursesSupa || !finalAiSupa) throw new Error('No se pudo inicializar ningún cliente Supabase.');
   if (!coreSupa) throw new Error('No se pudo inicializar el cliente Supabase CORE.');
 
   const ingredients = buildIngredients();
@@ -584,21 +555,21 @@ async function main() {
     - COURSES: courses=${courses.length}`);
 
   // Seeding AI_BRAIN
-  if (aiSupa) {
-    await upsertAll(aiSupa, 'ingredients', ingredients, { onConflict: 'id' });
-    console.log('Seed ingredients: OK (AI_BRAIN)');
-    await upsertAll(aiSupa, 'techniques', techniques, { onConflict: 'id' });
-    console.log('Seed techniques: OK (AI_BRAIN)');
+  if (finalAiSupa) {
+    await upsertAll(finalAiSupa, 'ingredients', ingredients, { onConflict: 'id' });
+    console.log(`Seed ingredients: OK (${finalAiSupa === coreSupa ? 'CORE' : 'AI_BRAIN'})`);
+    await upsertAll(finalAiSupa, 'techniques', techniques, { onConflict: 'id' });
+    console.log(`Seed techniques: OK (${finalAiSupa === coreSupa ? 'CORE' : 'AI_BRAIN'})`);
   }
 
   // Seeding COURSES
-  if (coursesSupa) {
-    await coursesSupa.from('courses').delete().neq('tier', '');
-    await upsertAll(coursesSupa, 'courses', courses, { onConflict: 'tier,days_required' });
-    console.log('Seed courses: OK (COURSES)');
+  if (finalCoursesSupa) {
+    await finalCoursesSupa.from('courses').delete().neq('tier', '');
+    await upsertAll(finalCoursesSupa, 'courses', courses, { onConflict: 'tier,days_required' });
+    console.log(`Seed courses: OK (${finalCoursesSupa === coreSupa ? 'CORE' : 'COURSES'})`);
 
     // Attach tests
-    const { data: storedCourses, error: fetchErr } = await coursesSupa.from('courses').select('id,title').order('created_at', { ascending: false }).limit(courses.length);
+    const { data: storedCourses, error: fetchErr } = await finalCoursesSupa.from('courses').select('id,title').order('created_at', { ascending: false }).limit(courses.length);
     if (fetchErr) throw fetchErr;
     const idByTitle = new Map((storedCourses || []).map((c) => [c.title, c.id]));
 
@@ -611,14 +582,14 @@ async function main() {
     }
 
     if (tests.length > 0) {
-      await coursesSupa.from('course_tests').delete().neq('course_id', null);
+      await finalCoursesSupa.from('course_tests').delete().neq('course_id', null);
       const chunk = 200;
       for (let i = 0; i < tests.length; i += chunk) {
         const slice = tests.slice(i, i + chunk);
-        const res = await coursesSupa.from('course_tests').insert(slice);
+        const res = await finalCoursesSupa.from('course_tests').insert(slice);
         if (res.error) throw res.error;
       }
-      console.log(`Seed course_tests: OK (${tests.length} preguntas en COURSES)`);
+      console.log(`Seed course_tests: OK (${tests.length} preguntas en ${finalCoursesSupa === coreSupa ? 'CORE' : 'COURSES'})`);
     }
   }
 

@@ -12,7 +12,7 @@ import { IS_LANDING } from '@/lib/deployTarget';
 
 export default function Navbar() {
   const { isAdmin } = useAdminAuth();
-  const { authState, openAuthModal, getEffectiveLevel } = useUserAuth();
+  const { authState, openAuthModal, getEffectiveLevel, logout } = useUserAuth();
   const userLevel = getEffectiveLevel();
   const [menuOpen, setMenuOpen] = useState(false);
   const closeMenu = () => setMenuOpen(false);
@@ -62,11 +62,13 @@ export default function Navbar() {
                 </button>
               )
             ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div className="user-nav-actions">
                 <Link href={appHref(isAdmin ? "/admin" : "/social/perfil")} className="chef-link" onClick={closeMenu}>
-                  <span className="user-badge">{userLevel}</span> {isAdmin ? 'ADMIN' : (authState.profile?.firstName || 'MI CUENTA')}
+                  <span className="user-badge">{userLevel}</span> 
+                  <span className="user-name">{isAdmin ? 'ADMINISTRADOR' : (authState.profile?.firstName || 'MI CUENTA')}</span>
                 </Link>
-                <button onClick={() => { useUserAuth().logout(); closeMenu(); }} className="logout-btn">
+                <div className="v-divider" />
+                <button onClick={() => { logout(); closeMenu(); }} className="logout-btn">
                   SALIR
                 </button>
               </div>
@@ -108,21 +110,29 @@ export default function Navbar() {
           color: var(--primary);
           border: 1px solid var(--primary);
         }
-        .logout-btn {
-          background: rgba(255,50,50,0.1);
-          color: #ff5555;
-          border: 1px solid rgba(255,50,50,0.2);
-          padding: 6px 14px;
+        .user-nav-actions {
+          display: flex;
+          align-items: center;
+          gap: 15px;
+          background: rgba(255,255,255,0.03);
+          padding: 5px 15px;
           border-radius: 12px;
+          border: 1px solid rgba(255,255,255,0.05);
+        }
+        .user-name { font-weight: 800; font-size: 0.75rem; color: var(--foreground); }
+        .v-divider { width: 1px; height: 20px; background: rgba(255,255,255,0.1); }
+        .logout-btn {
+          background: none;
+          color: #ff4444;
+          border: none;
+          padding: 0;
           font-size: 0.7rem;
-          font-weight: 800;
+          font-weight: 900;
           cursor: pointer;
           transition: 0.2s;
+          letter-spacing: 1px;
         }
-        .logout-btn:hover {
-          background: #ff5555;
-          color: white;
-        }
+        .logout-btn:hover { color: white; transform: scale(1.05); }
 
         :global(.nav-links) {
           display: flex;

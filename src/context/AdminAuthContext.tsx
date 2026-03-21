@@ -41,15 +41,22 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
         setIsAdmin(true);
         return true;
       }
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
       const res = await fetch('/api/admin/session/login', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ username, password }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
+      
       if (!res.ok) return false;
       setIsAdmin(true);
       return true;
-    } catch {
+    } catch (err: any) {
+      console.warn('[AdminAuth] Login failed or timed out:', err.message);
       return false;
     }
   };

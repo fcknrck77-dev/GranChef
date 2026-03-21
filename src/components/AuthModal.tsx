@@ -5,8 +5,9 @@ import { useUserAuth } from '@/context/UserAuthContext';
 import { X, User, Mail, MapPin, Briefcase, Key, ShieldCheck, LogIn, Eye, EyeOff } from 'lucide-react';
 
 export default function AuthModal() {
-  const { isAuthModalOpen, closeAuthModal, registerUser, login, authState } = useUserAuth();
+  const { isAuthModalOpen, closeAuthModal, registerUser, registerCompany, login, authState } = useUserAuth();
   const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [accountType, setAccountType] = useState<'individual' | 'company'>('individual');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -20,6 +21,11 @@ export default function AuthModal() {
     password: '',
     professionalSector: '',
     vipCode: '',
+    // Company fields
+    businessName: '',
+    vatNumber: '',
+    sector: '',
+    address: '',
   });
 
   if (!isAuthModalOpen) return null;
@@ -33,32 +39,54 @@ export default function AuthModal() {
     setError('');
     setLoading(true);
 
-    if (mode === 'register') {
-      if (!formData.firstName || !formData.lastName || !formData.province || !formData.city || !formData.email) {
-        setError('Por favor, rellena todos los campos obligatorios (*).');
-        setLoading(false);
-        return;
-      }
-      registerUser(
-        {
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          province: formData.province,
-          city: formData.city,
-          email: formData.email,
-          professionalSector: formData.professionalSector,
-        },
-        formData.vipCode
-      );
-    } else {
-      const success = await login(formData.email, formData.password);
-      if (success) {
-        closeAuthModal();
+    try {
+      if (mode === 'register') {
+        if (accountType === 'company') {
+          if (!formData.businessName || !formData.vatNumber || !formData.email) {
+            setError('Por favor, rellena los datos de empresa obligatorios.');
+            return;
+          }
+          await registerCompany(
+            {
+              businessName: formData.businessName,
+              vatNumber: formData.vatNumber,
+              sector: formData.sector,
+              address: formData.address,
+              city: formData.city,
+            },
+            formData.email
+          );
+        } else {
+          if (!formData.firstName || !formData.lastName || !formData.province || !formData.city || !formData.email) {
+            setError('Por favor, rellena todos los campos obligatorios (*).');
+            return;
+          }
+          await registerUser(
+            {
+              firstName: formData.firstName,
+              lastName: formData.lastName,
+              province: formData.province,
+              city: formData.city,
+              email: formData.email,
+              professionalSector: formData.professionalSector,
+            },
+            formData.vipCode
+          );
+        }
       } else {
-        setError('Acceso denegado. Comprueba tus datos.');
+        const success = await login(formData.email, formData.password);
+        if (success) {
+          closeAuthModal();
+        } else {
+          setError('Acceso denegado. Comprueba tus datos.');
+        }
       }
+    } catch (err: any) {
+      console.error('[AuthModal] Submission error:', err);
+      setError('Ocurrió un error inesperado.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
@@ -76,10 +104,29 @@ export default function AuthModal() {
           <p>{mode === 'login' ? 'Accede a tu biblioteca personalizada' : 'Crea tu perfil profesional culinario'}</p>
         </div>
 
+        {mode === 'register' && (
+          <div className="account-type-selector">
+            <button 
+              type="button" 
+              className={accountType === 'individual' ? 'active' : ''} 
+              onClick={() => setAccountType('individual')}
+            >
+              CHEF INDIVIDUAL
+            </button>
+            <button 
+              type="button" 
+              className={accountType === 'company' ? 'active' : ''} 
+              onClick={() => setAccountType('company')}
+            >
+              EMPRESA / GRUPO
+            </button>
+          </div>
+        )}
+
         {error && <div className="error-msg">{error}</div>}
 
         <form onSubmit={handleSubmit} className="auth-form">
-          {mode === 'register' && (
+          {mode === 'register' && accountType === 'individual' && (
              <div className="input-row">
                <div className="input-icon-group">
                  <User size={18} />
@@ -89,6 +136,19 @@ export default function AuthModal() {
                  <input type="text" name="lastName" placeholder="Apellidos *" value={formData.lastName} onChange={handleChange} />
                </div>
              </div>
+          )}
+
+          {mode === 'register' && accountType === 'company' && (
+            <>
+              <div className="input-icon-group">
+                <Briefcase size={18} />
+                <input type="text" name="businessName" placeholder="Razón Social / Nombre Comercial *" value={formData.businessName} onChange={handleChange} />
+              </div>
+              <div className="input-icon-group">
+                <ShieldCheck size={18} />
+                <input type="text" name="vatNumber" placeholder="CIF / VAT Number *" value={formData.vatNumber} onChange={handleChange} />
+              </div>
+            </>
           )}
 
           <div className="input-icon-group">
@@ -125,10 +185,18 @@ export default function AuthModal() {
                   <input type="text" name="city" placeholder="Ciudad *" value={formData.city} onChange={handleChange} />
                 </div>
               </div>
-              <div className="input-icon-group">
-                <Briefcase size={18} />
-                <input type="text" name="professionalSector" placeholder="Sector Profesional" value={formData.professionalSector} onChange={handleChange} />
-              </div>
+              {accountType === 'individual' && (
+                <div className="input-icon-group">
+                  <Briefcase size={18} />
+                  <input type="text" name="professionalSector" placeholder="Sector Profesional" value={formData.professionalSector} onChange={handleChange} />
+                </div>
+              )}
+              {accountType === 'company' && (
+                <div className="input-icon-group">
+                  <MapPin size={18} />
+                  <input type="text" name="address" placeholder="Dirección Fiscal" value={formData.address} onChange={handleChange} />
+                </div>
+              )}
               <div className="input-icon-group vip-group">
                 <ShieldCheck size={18} />
                 <input type="text" name="vipCode" placeholder="CÓDIGO VIP (OPCIONAL)" value={formData.vipCode} onChange={handleChange} className="vip-input" />
@@ -187,34 +255,36 @@ export default function AuthModal() {
         }
         .close-btn:hover { opacity: 1; }
 
-        .auth-tabs {
+        .account-type-selector {
           display: flex;
+          gap: 10px;
+          margin-bottom: 25px;
           background: var(--modal-surface-2);
+          padding: 4px;
           border-radius: 12px;
-          padding: 5px;
-          margin-bottom: 30px;
           border: 1px solid var(--modal-border);
         }
-        .tab-btn {
+        .account-type-selector button {
           flex: 1;
-          padding: 10px;
+          padding: 8px;
           border: none;
           background: none;
           color: var(--modal-text);
-          font-weight: 700;
-          font-size: 0.8rem;
+          font-size: 0.65rem;
+          font-weight: 800;
           cursor: pointer;
           border-radius: 8px;
           transition: 0.3s;
-          opacity: 0.5;
+          opacity: 0.4;
         }
-        .tab-btn.active {
+        .account-type-selector button.active {
           background: var(--primary);
+          color: black;
           opacity: 1;
-          box-shadow: 0 0 15px var(--primary-glow);
+          box-shadow: 0 4px 15px var(--primary-glow);
         }
 
-        .auth-header { text-align: center; margin-bottom: 30px; }
+        .auth-header { text-align: center; margin-bottom: 20px; }
         .auth-header h2 { font-size: 2rem; color: var(--primary); margin-bottom: 8px; letter-spacing: -1px; }
         .auth-header p { font-size: 0.9rem; opacity: 0.8; color: var(--modal-muted); }
 

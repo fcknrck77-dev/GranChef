@@ -148,48 +148,39 @@ export async function fulfillAiRequest(requestId: string) {
       throw new Error(`Unsupported kind: ${request.kind}`);
     }
 
-    let completion;
-    let usedProvider = '';
+    let usedProvider = 'Ollama (Local)';
+    console.log(`[AI SERVICE] Attempting with local Ollama (/api/generate)...`);
 
-    const attemptConfigs: { name: string, key: string, base: string, model: string }[] = [];
-    if (process.env.OPENROUTER_API_KEY) {
-      attemptConfigs.push({ name: 'OpenRouter', key: process.env.OPENROUTER_API_KEY, base: 'https://openrouter.ai/api/v1', model: process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct' });
-    }
-    if (process.env.GROQ_API_KEY) {
-      attemptConfigs.push({ name: 'Groq-1', key: process.env.GROQ_API_KEY, base: 'https://api.groq.com/openai/v1', model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile' });
-    }
-    if (process.env.GROQ_API_KEY_2) {
-      attemptConfigs.push({ name: 'Groq-2', key: process.env.GROQ_API_KEY_2, base: 'https://api.groq.com/openai/v1', model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile' });
+    const ollamaResponse = await fetch('http://localhost:11434/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'llama3',
+        prompt: `System: ${SYSTEM_IDENTITY}\n\nUser: ${userPrompt}\n\nEnsure that your entire response is ONLY a valid JSON object matching the requested schema.`,
+        stream: false,
+        format: 'json'
+      })
+    });
+
+    if (!ollamaResponse.ok) {
+      throw new Error(`Ollama locally failed: ${ollamaResponse.statusText}`);
     }
 
-    let success = false;
-    for (const conf of attemptConfigs) {
-      try {
-        console.log(`[AI SERVICE] Attempting with ${conf.name}...`);
-        const client = new OpenAI({
-          apiKey: conf.key,
-          baseURL: conf.base,
-          defaultHeaders: conf.name === 'OpenRouter' ? { 'HTTP-Referer': 'https://grandchefapp.online', 'X-Title': 'GrandChef Lab' } : {}
-        });
-
-        completion = await client.chat.completions.create({
-          model: conf.model,
-          messages: [{ role: 'system', content: SYSTEM_IDENTITY }, { role: 'user', content: userPrompt }],
-          response_format: { type: 'json_object' },
-          temperature: 0.7
-        });
-        usedProvider = conf.name;
-        success = true;
-        break;
-      } catch (err) {
-        console.warn(`[AI SERVICE] ${conf.name} failed: ${(err as any).message}`);
+    const oData = await ollamaResponse.json();
+    const resultText = oData.response || '{}';
+    let resultJson = {};
+    try {
+      resultJson = JSON.parse(resultText);
+    } catch(err) {
+      console.warn('Ollama returned invalid JSON. Attempting fallback matching.', resultText);
+      const start = resultText.indexOf('{');
+      const end = resultText.lastIndexOf('}');
+      if (start !== -1 && end !== -1) {
+        resultJson = JSON.parse(resultText.slice(start, end + 1));
+      } else {
+        throw err;
       }
     }
-
-    if (!success || !completion) throw new Error('All AI providers (OpenRouter/Groq-1/Groq-2) failed.');
-
-    const resultText = completion.choices[0].message?.content || '{}';
-    const resultJson = JSON.parse(resultText);
     console.log(`[AI SERVICE] Success using ${usedProvider}`);
 
     // Insert into final table (normalize to DB schema)

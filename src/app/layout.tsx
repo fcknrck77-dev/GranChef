@@ -11,8 +11,12 @@ import { TrialBlockedModal } from "@/components/TrialBlockedModal";
 import HelpChat from "@/components/HelpChat";
 
 export const metadata: Metadata = {
-  title: "GrandChef Lab - Omniscience",
-  description: "The ultimate culinary experimentation laboratory",
+  title: "GrandChef Lab | Intelligence & Gastronomy",
+  description: "The official corporate infrastructure for culinary intelligence and research.",
+  icons: {
+    icon: "/logo_premium.png",
+    apple: "/logo_premium.png",
+  }
 };
 
 export default function RootLayout({
