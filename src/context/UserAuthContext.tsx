@@ -90,60 +90,67 @@ export const UserAuthProvider = ({ children }: { children: React.ReactNode }) =>
     const supabase = getSupabase('CORE');
     if (!supabase) return;
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) {
-        setAuthState(prev => ({ ...prev, isRegistered: false, isLoading: false }));
-        return;
-    }
-
-    const { data: userRow } = await supabase
-      .from('app_users')
-      .select('*')
-      .eq('id', session.user.id)
-      .maybeSingle();
-
-    if (userRow) {
-      const net = getSupabase('NETWORKING');
-      let accountType: 'individual' | 'company' = (userRow.account_type === 'company') ? 'company' : 'individual';
-      let companyProfile: CompanyProfile | null = null;
-
-      if (net && accountType === 'company') {
-          const { data: cp } = await net.from('company_profiles').select('*').eq('id', session.user.id).maybeSingle();
-          if (cp) {
-            companyProfile = {
-              businessName: cp.business_name,
-              vatNumber: cp.vat_number,
-              sector: cp.sector,
-              address: cp.address,
-              city: cp.city,
-              logoUrl: cp.logo_url
-            };
-          }
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
+          setAuthState(prev => ({ ...prev, isRegistered: false, isLoading: false }));
+          return;
       }
 
-      setAuthState({
-        isRegistered: true,
-        accountType,
-        profile: {
-          firstName: userRow.name?.split(' ')[0] || '',
-          lastName: userRow.name?.split(' ').slice(1).join(' ') || '',
-          province: userRow.province || '',
-          city: userRow.city || '',
-          email: session.user.email || '',
-          professionalSector: userRow.professional_sector,
-        },
-        companyProfile,
-        level: (userRow.plan || 'FREE') as AccessLevel,
-        registrationDate: userRow.created_at || new Date().toISOString(),
-        vipCode: userRow.vip_code,
-        activationDate: userRow.activated_at,
-        trialStartAt: userRow.trial_start_at,
-        registrationIp: userRow.registration_ip,
-        id: session.user.id,
-        isLoading: false
-      });
-    } else {
-        setAuthState(prev => ({ ...prev, isRegistered: false, isLoading: false }));
+      const { data: userRow } = await supabase
+        .from('app_users')
+        .select('*')
+        .eq('id', session.user.id)
+        .maybeSingle();
+
+      if (userRow) {
+        const net = getSupabase('NETWORKING');
+        let accountType: 'individual' | 'company' = (userRow.account_type === 'company') ? 'company' : 'individual';
+        let companyProfile: CompanyProfile | null = null;
+
+        if (net && accountType === 'company') {
+            const { data: cp } = await net.from('company_profiles').select('*').eq('id', session.user.id).maybeSingle();
+            if (cp) {
+              companyProfile = {
+                businessName: cp.business_name,
+                vatNumber: cp.vat_number,
+                sector: cp.sector,
+                address: cp.address,
+                city: cp.city,
+                logoUrl: cp.logo_url
+              };
+            }
+        }
+
+        setAuthState({
+          isRegistered: true,
+          accountType,
+          profile: {
+            firstName: userRow.name?.split(' ')[0] || '',
+            lastName: userRow.name?.split(' ').slice(1).join(' ') || '',
+            province: userRow.province || '',
+            city: userRow.city || '',
+            email: session.user.email || '',
+            professionalSector: userRow.professional_sector,
+          },
+          companyProfile,
+          level: (userRow.plan || 'FREE') as AccessLevel,
+          registrationDate: userRow.created_at || new Date().toISOString(),
+          vipCode: userRow.vip_code,
+          activationDate: userRow.activated_at,
+          trialStartAt: userRow.trial_start_at,
+          registrationIp: userRow.registration_ip,
+          id: session.user.id,
+          isLoading: false
+        });
+      } else {
+          setAuthState(prev => ({ ...prev, isRegistered: false, isLoading: false }));
+      }
+    } catch (err) {
+      console.error('Error syncing user:', err);
+      setAuthState(prev => ({ ...prev, isLoading: false }));
+    } finally {
+      setAuthState(prev => ({ ...prev, isLoading: false }));
     }
   };
 
